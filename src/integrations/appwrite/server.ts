@@ -9,10 +9,9 @@ function baseClient() {
 }
 
 export function createAppwriteAdminClient(scope: "auth" | "storage" | "database") {
+  void scope; // Kept as a compatibility hint for callers; all services share one scoped runtime key.
   const config = env();
-  const scopedKey = scope === "auth" ? config.APPWRITE_AUTH_API_KEY : scope === "storage" ? config.APPWRITE_STORAGE_API_KEY : config.APPWRITE_DATABASE_API_KEY;
-  const scopedKeyFile = scope === "auth" ? config.APPWRITE_AUTH_API_KEY_FILE : scope === "storage" ? config.APPWRITE_STORAGE_API_KEY_FILE : config.APPWRITE_DATABASE_API_KEY_FILE;
-  const apiKey = readSecret(scopedKey, scopedKeyFile, `Appwrite ${scope} runtime key`);
+  const apiKey = readSecret(config.APPWRITE_API_KEY, config.APPWRITE_API_KEY_FILE, "Appwrite runtime key");
   const client = baseClient().setKey(apiKey);
   return { account: new Account(client), users: new Users(client), storage: new Storage(client), databases: new Databases(client) };
 }
