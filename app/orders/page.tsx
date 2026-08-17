@@ -1,0 +1,7 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { listCustomerOrders } from "@/src/modules/orders/server/repository";
+export const dynamic = "force-dynamic";
+const money = (value: number, currency: string) => new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(value / 100);
+export default async function OrdersPage() { const user = await getCurrentAppwriteUser(); if (!user) redirect("/login?returnTo=/orders"); const orders = await listCustomerOrders(user.$id); return <main className="marketplace-shell"><nav><Link className="brand" href="/"><span>PAC</span><b>SM</b></Link><Link href="/account">My account</Link></nav><header><p className="kicker">PURCHASE HISTORY</p><h1>Your orders.</h1><p>Track every marketplace purchase from payment through delivery.</p></header><section className="review-table"><div className="review-row review-head"><span>Order</span><span>Status</span><span>Total</span><span>Details</span></div>{orders.documents.length ? orders.documents.map(order => <div className="review-row" key={order.$id}><span>{String(order.orderNumber)}</span><strong>{String(order.status).replaceAll("_", " ")}</strong><span>{money(Number(order.totalMinor), String(order.currency))}</span><Link href={`/orders/${order.$id}`}>View →</Link></div>) : <p className="empty-state">You have not placed an order yet.</p>}</section></main>; }

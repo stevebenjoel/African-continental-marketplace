@@ -1,0 +1,8 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { listVendorOrders } from "@/src/modules/orders/server/repository";
+import { findVendorByOwner } from "@/src/modules/vendors/server/repository";
+export const dynamic = "force-dynamic";
+const money = (value: number, currency: string) => new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(value / 100);
+export default async function SellerOrdersPage() { const user = await getCurrentAppwriteUser(); if (!user) redirect("/login?returnTo=/seller/orders"); const vendor = await findVendorByOwner(user.$id); if (!vendor) redirect("/vendor/register"); if (!["approved", "active"].includes(String(vendor.status))) redirect("/seller"); const orders = await listVendorOrders(vendor.$id); return <main className="seller-shell"><nav><Link className="brand" href="/"><span>PAC</span><b>SM</b></Link><Link href="/seller">Seller Centre</Link></nav><header><div><p className="kicker">ORDER OPERATIONS</p><h1>Seller orders</h1><p>Only orders assigned to your vendor account appear here.</p></div></header><section className="review-table"><div className="review-row review-head"><span>Order</span><span>Status</span><span>Value</span><span>Action</span></div>{orders.documents.length ? orders.documents.map(order => <div className="review-row" key={order.$id}><span>{String(order.vendorOrderNumber)}</span><strong>{String(order.status).replaceAll("_", " ")}</strong><span>{money(Number(order.subtotalMinor), String(order.currency))}</span><Link href={`/seller/orders/${order.$id}`}>Fulfil →</Link></div>) : <p className="empty-state">No customer orders have reached your store yet.</p>}</section></main>; }

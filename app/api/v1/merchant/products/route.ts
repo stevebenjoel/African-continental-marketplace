@@ -1,0 +1,5 @@
+import { Query } from "node-appwrite";
+import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
+import { env } from "@/src/shared/config/env";
+import { apiError, authenticateMerchantRequest, recordApiUsage } from "@/src/modules/integrations/server/api-auth";
+export async function GET(request: Request) { const auth = await authenticateMerchantRequest(request, "products:read"); if (!auth) return apiError("Invalid credential or missing products:read scope", 401); if (auth.rateLimited) return apiError("Rate limit exceeded", 429); const result = await createAppwriteDatabaseClient().databases.listDocuments({ databaseId: env().APPWRITE_DATABASE_ID, collectionId: "products", queries: [Query.equal("submittedByVendorId", auth.vendorId), Query.limit(100)] }); await recordApiUsage(auth.credential.$id, auth.vendorId, request, 200); return Response.json({ data: result.documents, meta: { total: result.total, version: "v1" } }, { headers: { "Cache-Control": "private, no-store", "X-PACSM-API-Version": "v1" } }); }

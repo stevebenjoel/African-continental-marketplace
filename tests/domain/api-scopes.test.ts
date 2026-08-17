@@ -1,0 +1,2 @@
+import test from "node:test"; import assert from "node:assert/strict"; import { hasScope, validScopes } from "../../src/modules/integrations/domain/scopes.ts";
+test("merchant API scopes are explicit and least privileged", () => { assert.equal(validScopes(["products:read", "orders:read"]), true); assert.equal(validScopes(["admin:all"]), false); assert.equal(hasScope(["products:read"], "inventory:write"), false); });

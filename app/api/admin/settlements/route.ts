@@ -1,0 +1,5 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import { isSuperAdmin } from "@/src/modules/authorization/domain/super-admin";
+import { processSettlement } from "@/src/modules/finance/server/settlements";
+export async function POST(request: Request) { try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); } const user = await getCurrentAppwriteUser(); if (!user || !isSuperAdmin(user.labels)) return new Response("Forbidden", { status: 403 }); const form = await request.formData(); try { await processSettlement({ vendorId: String(form.get("vendorId") ?? ""), currency: String(form.get("currency") ?? ""), actorUserId: user.$id }); return Response.redirect(new URL("/admin/settlements?paid=1", request.url), 303); } catch (error) { console.error("Settlement failed", error); return Response.redirect(new URL("/admin/settlements?error=1", request.url), 303); } }

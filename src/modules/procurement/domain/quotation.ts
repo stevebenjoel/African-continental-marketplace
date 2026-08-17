@@ -1,0 +1,1 @@
+export function quotationTotal(quantity:number,unitPriceMinor:number){if(!Number.isInteger(quantity)||quantity<1||!Number.isSafeInteger(unitPriceMinor)||unitPriceMinor<1)throw new Error("Invalid quotation values");const total=quantity*unitPriceMinor;if(!Number.isSafeInteger(total))throw new Error("Quotation total is too large");return total}

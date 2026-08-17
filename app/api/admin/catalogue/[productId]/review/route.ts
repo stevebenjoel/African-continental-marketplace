@@ -1,0 +1,5 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import { isSuperAdmin } from "@/src/modules/authorization/domain/super-admin";
+import { reviewProduct } from "@/src/modules/catalogue/server/repository";
+export async function POST(request: Request, { params }: { params: Promise<{ productId: string }> }) { try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); } const user = await getCurrentAppwriteUser(); if (!user || !isSuperAdmin(user.labels)) return new Response("Forbidden", { status: 403 }); const form = await request.formData(); const action = String(form.get("action")); if (!["approve", "reject", "request_changes"].includes(action)) return new Response("Invalid action", { status: 400 }); const { productId } = await params; await reviewProduct(productId, action as "approve" | "reject" | "request_changes", user.$id, String(form.get("notes") ?? "")); return Response.redirect(new URL("/admin/catalogue", request.url), 303); }

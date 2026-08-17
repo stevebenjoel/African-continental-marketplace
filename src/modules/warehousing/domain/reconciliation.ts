@@ -1,0 +1,1 @@
+export function reconcileInbound(expected:number,received:number,putaway:number){if(![expected,received,putaway].every(Number.isInteger)||expected<1||received<0||putaway<0||received>expected||putaway>received)throw new Error("Invalid inbound quantities");return{shortage:expected-received,awaitingPutaway:received-putaway,reconciled:expected===received&&received===putaway}}

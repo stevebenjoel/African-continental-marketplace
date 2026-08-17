@@ -1,0 +1,6 @@
+export const TRACKING_STATUSES = ["assigned", "accepted", "picked_up", "at_hub", "in_transit", "out_for_delivery", "delivered", "exception"] as const;
+export type TrackingStatus = typeof TRACKING_STATUSES[number];
+const transitions: Record<TrackingStatus, TrackingStatus[]> = { assigned: ["accepted"], accepted: ["picked_up", "exception"], picked_up: ["at_hub", "in_transit", "exception"], at_hub: ["in_transit", "exception"], in_transit: ["at_hub", "out_for_delivery", "exception"], out_for_delivery: ["delivered", "exception"], delivered: [], exception: ["in_transit", "out_for_delivery"] };
+export const isTrackingStatus = (value: string): value is TrackingStatus => (TRACKING_STATUSES as readonly string[]).includes(value);
+export const canTransitionTracking = (current: TrackingStatus, next: TrackingStatus) => transitions[current].includes(next);
+export function calculateCarrierRate(baseRateMinor: number, perKgRateMinor: number, weightGrams: number) { if (![baseRateMinor, perKgRateMinor, weightGrams].every(Number.isSafeInteger) || baseRateMinor < 0 || perKgRateMinor < 0 || weightGrams < 0) throw new Error("Invalid carrier rate"); return baseRateMinor + Math.ceil(weightGrams / 1000) * perKgRateMinor; }

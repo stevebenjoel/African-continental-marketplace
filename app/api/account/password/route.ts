@@ -1,0 +1,5 @@
+import { cookies } from "next/headers";
+import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import { createAppwriteSessionClient } from "@/src/integrations/appwrite/server";
+import { env } from "@/src/shared/config/env";
+export async function POST(request: Request) { try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); } const session = (await cookies()).get(env().SESSION_COOKIE_NAME)?.value; if (!session) return new Response("Unauthorized", { status: 401 }); const form = await request.formData(), password = String(form.get("newPassword") ?? ""), oldPassword = String(form.get("currentPassword") ?? ""); try { if (password.length < 12 || password === oldPassword) throw new Error("Weak password"); await createAppwriteSessionClient(session).account.updatePassword({ password, oldPassword }); return Response.redirect(new URL("/account/security?changed=1", request.url), 303); } catch { return Response.redirect(new URL("/account/security?error=1", request.url), 303); } }

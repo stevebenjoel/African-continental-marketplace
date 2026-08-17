@@ -1,0 +1,4 @@
+import "server-only"; import { Query } from "node-appwrite"; import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server"; import { env } from "@/src/shared/config/env";
+const db=()=>createAppwriteDatabaseClient().databases,id=()=>env().APPWRITE_DATABASE_ID;
+export const listNotifications=(userId:string)=>db().listDocuments({databaseId:id(),collectionId:"notifications",queries:[Query.equal("userId",userId),Query.orderDesc("createdAt"),Query.limit(100)]});
+export async function markNotificationRead(userId:string,notificationId:string){const item=await db().getDocument({databaseId:id(),collectionId:"notifications",documentId:notificationId});if(item.userId!==userId)throw new Error("Not found");await db().updateDocument({databaseId:id(),collectionId:"notifications",documentId:notificationId,data:{readAt:new Date().toISOString()}})}

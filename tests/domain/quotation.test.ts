@@ -1,0 +1,1 @@
+import assert from"node:assert/strict";import{describe,it}from"node:test";import{quotationTotal}from"../../src/modules/procurement/domain/quotation.ts";describe("procurement quotation",()=>{it("calculates integer minor-unit totals",()=>assert.equal(quotationTotal(250,1999),499750));it("rejects invalid quantities",()=>assert.throws(()=>quotationTotal(0,100)))})

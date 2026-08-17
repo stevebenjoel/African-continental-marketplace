@@ -1,0 +1,2 @@
+export type PriceTier = Readonly<{ minimumQuantity: number; maximumQuantity?: number; unitPriceMinor: number }>;
+export function resolveWholesalePrice(quantity: number, basePriceMinor: number, tiers: readonly PriceTier[]): number { if (!Number.isInteger(quantity) || quantity < 1) throw new Error("Invalid quantity"); const eligible = tiers.filter(tier => quantity >= tier.minimumQuantity && (!tier.maximumQuantity || quantity <= tier.maximumQuantity)).sort((a,b)=>b.minimumQuantity-a.minimumQuantity); return eligible[0]?.unitPriceMinor ?? basePriceMinor; }

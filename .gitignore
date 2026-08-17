@@ -1,0 +1,13 @@
+node_modules/
+.next/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+.dev-server*.log
+.preview*.log
+coverage/
+dist/
+.DS_Store
+.codex/
+.tmp-*

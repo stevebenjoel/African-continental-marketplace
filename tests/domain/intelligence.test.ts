@@ -1,0 +1,3 @@
+import test from "node:test"; import assert from "node:assert/strict"; import { forecastDemand, orderRiskScore } from "../../src/modules/intelligence/domain/forecast.ts";
+test("demand forecast responds to recent velocity", () => { assert.equal(forecastDemand(30, 14).trend, "rising"); assert.equal(forecastDemand(30, 7).trend, "stable"); });
+test("risk scoring is explainable and capped", () => { const risk = orderRiskScore({ totalMinor: 25_000_000, disputes: 3, itemQuantity: 150 }); assert.equal(risk.score, 100); assert.equal(risk.severity, "high"); assert.ok(risk.reasons.includes("repeat_disputes")); });

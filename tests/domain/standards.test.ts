@@ -1,0 +1,3 @@
+import test from "node:test";import assert from "node:assert/strict";import{complianceProgress,isCertificationReviewAction}from"../../src/modules/standards/domain/compliance.ts";
+test("compliance progress considers mandatory requirements",()=>{assert.deepEqual(complianceProgress([{id:"a",mandatory:true},{id:"b",mandatory:false}],["b"]),{completed:0,total:1,percent:0,ready:false});assert.equal(complianceProgress([{id:"a",mandatory:true}],["a"]).ready,true)});
+test("certification decisions are controlled",()=>{assert.equal(isCertificationReviewAction("approve"),true);assert.equal(isCertificationReviewAction("delete"),false)});

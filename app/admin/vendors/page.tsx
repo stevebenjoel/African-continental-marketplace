@@ -1,0 +1,5 @@
+import Link from "next/link";
+import { requireSuperAdmin } from "@/src/modules/authorization/server/require-super-admin";
+import { listVendors } from "@/src/modules/vendors/server/repository";
+export const dynamic = "force-dynamic";
+export default async function VendorQueue() { await requireSuperAdmin(); const vendors = await listVendors(); return <main className="admin-detail"><header><div><p className="kicker">KYC / KYB OPERATIONS</p><h1>Vendor review queue</h1></div><Link href="/admin">Back to overview</Link></header><section className="review-table"><div className="review-row review-head"><span>Reference</span><span>Status</span><span>Submitted</span><span>Action</span></div>{vendors.documents.length ? vendors.documents.map((vendor) => <div className="review-row" key={vendor.$id}><span>{vendor.$id}</span><strong>{String(vendor.status).replaceAll("_", " ")}</strong><span>{new Date(String(vendor.submittedAt)).toLocaleDateString("en-GB")}</span><Link href={`/admin/vendors/${vendor.$id}`}>Review →</Link></div>) : <p className="empty-state">No vendor applications have been submitted.</p>}</section></main>; }

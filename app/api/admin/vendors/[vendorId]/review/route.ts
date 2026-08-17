@@ -1,0 +1,5 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import { isSuperAdmin } from "@/src/modules/authorization/domain/super-admin";
+import { reviewVendor } from "@/src/modules/vendors/server/repository";
+export async function POST(request: Request, { params }: { params: Promise<{ vendorId: string }> }) { try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); } const user = await getCurrentAppwriteUser(); if (!user || !isSuperAdmin(user.labels)) return new Response("Forbidden", { status: 403 }); const form = await request.formData(); const action = String(form.get("action")); if (!["approve", "reject", "request_information"].includes(action)) return new Response("Invalid review action", { status: 400 }); const { vendorId } = await params; await reviewVendor(vendorId, action as "approve" | "reject" | "request_information", String(form.get("notes") ?? "").trim(), user.$id); return Response.redirect(new URL(`/admin/vendors/${vendorId}?updated=1`, request.url), 303); }

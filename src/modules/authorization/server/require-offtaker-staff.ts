@@ -1,0 +1,1 @@
+import"server-only";import{notFound,redirect}from"next/navigation";import{getCurrentAppwriteUser}from"@/src/modules/auth/server/session";export async function requireOfftakerStaff(){const u=await getCurrentAppwriteUser();if(!u)redirect("/login?returnTo=/admin/offtakers");if(!u.labels.some(l=>["superadmin","offtaker_verification"].includes(l)))notFound();return u}

@@ -1,0 +1,5 @@
+import { Query } from "node-appwrite";
+import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
+import { env } from "@/src/shared/config/env";
+import { apiError, authenticateMerchantRequest, recordApiUsage } from "@/src/modules/integrations/server/api-auth";
+export async function GET(request: Request) { const auth = await authenticateMerchantRequest(request, "orders:read"); if (!auth) return apiError("Invalid credential or missing orders:read scope", 401); if (auth.rateLimited) return apiError("Rate limit exceeded", 429); const url = new URL(request.url), status = url.searchParams.get("status"), queries = [Query.equal("vendorId", auth.vendorId), Query.orderDesc("createdAt"), Query.limit(100)]; if (status) queries.push(Query.equal("status", status)); const result = await createAppwriteDatabaseClient().databases.listDocuments({ databaseId: env().APPWRITE_DATABASE_ID, collectionId: "vendor_orders", queries }); await recordApiUsage(auth.credential.$id, auth.vendorId, request, 200); return Response.json({ data: result.documents, meta: { total: result.total, version: "v1" } }); }

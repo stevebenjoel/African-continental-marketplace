@@ -1,0 +1,10 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Query } from "node-appwrite";
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { findVendorByOwner } from "@/src/modules/vendors/server/repository";
+import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
+import { env } from "@/src/shared/config/env";
+export const dynamic = "force-dynamic";
+const money = (value: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(value / 100);
+export default async function SellerAnalyticsPage() { const user = await getCurrentAppwriteUser(); if (!user) redirect("/login?returnTo=/seller/analytics"); const vendor = await findVendorByOwner(user.$id); if (!vendor) redirect("/vendor/register"); const db = createAppwriteDatabaseClient().databases, databaseId = env().APPWRITE_DATABASE_ID; const [orders, products, disputes] = await Promise.all([db.listDocuments({ databaseId, collectionId: "vendor_orders", queries: [Query.equal("vendorId", vendor.$id), Query.limit(5000)] }), db.listDocuments({ databaseId, collectionId: "products", queries: [Query.equal("submittedByVendorId", vendor.$id), Query.limit(5000)] }), db.listDocuments({ databaseId, collectionId: "disputes", queries: [Query.equal("vendorId", vendor.$id), Query.limit(5000)] })]); const gross = orders.documents.reduce((sum, order) => sum + Number(order.subtotalMinor), 0); return <main className="seller-shell"><nav><Link className="brand" href="/"><span>PAC</span><b>SM</b></Link><Link href="/seller">Seller Centre</Link></nav><header><div><p className="kicker">STORE PERFORMANCE</p><h1>Seller analytics</h1></div></header><section className="seller-grid"><article><span>GROSS SALES</span><strong>{money(gross)}</strong></article><article><span>ORDERS</span><strong>{orders.total}</strong></article><article><span>PRODUCTS</span><strong>{products.total}</strong></article><article><span>DISPUTES</span><strong>{disputes.total}</strong></article></section></main>; }

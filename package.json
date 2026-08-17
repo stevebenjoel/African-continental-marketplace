@@ -1,0 +1,33 @@
+{
+  "name": "pac-sm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/domain/*.test.ts",
+    "appwrite:provision": "tsx scripts/provision-appwrite.ts",
+    "appwrite:seed-demo": "tsx scripts/seed-demo-products.ts"
+  },
+  "dependencies": {
+    "next": "16.3.1",
+    "node-appwrite": "21.1.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.3.1",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}
