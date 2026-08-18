@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const sessionCookie = appwriteResponse.headers.getSetCookie().find((value) => value.startsWith(`a_session_${config.APPWRITE_PROJECT_ID}=`));
     const sessionSecret = sessionCookie?.slice(sessionCookie.indexOf("=") + 1, sessionCookie.indexOf(";"));
     if (!sessionSecret) throw new Error("Appwrite did not return a server session cookie");
-    const response = NextResponse.redirect(new URL(safeReturnTo(form.get("returnTo")), request.url), 303);
+    const response = NextResponse.redirect(new URL(safeReturnTo(form.get("returnTo")), config.APP_BASE_URL), 303);
     response.cookies.set(config.SESSION_COOKIE_NAME, decodeURIComponent(sessionSecret), sessionCookieOptions(session.expire));
     return response;
   } catch (error) {
@@ -31,8 +31,9 @@ export async function POST(request: Request) {
       message: "message" in error ? error.message : undefined
     } : { message: "Unknown login failure" };
     console.error("Appwrite login failed", diagnostic);
-    const failureUrl = new URL("/login?error=invalid_credentials", request.url);
-    if (env().NODE_ENV === "development") failureUrl.searchParams.set("reason", String(diagnostic.type ?? diagnostic.code ?? diagnostic.message ?? "unknown"));
+    const config = env();
+    const failureUrl = new URL("/login?error=invalid_credentials", config.APP_BASE_URL);
+    if (config.NODE_ENV === "development") failureUrl.searchParams.set("reason", String(diagnostic.type ?? diagnostic.code ?? diagnostic.message ?? "unknown"));
     return NextResponse.redirect(failureUrl, 303);
   }
 }
