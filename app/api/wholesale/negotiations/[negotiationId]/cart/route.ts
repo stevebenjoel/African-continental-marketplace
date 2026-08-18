@@ -1,0 +1,4 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin, publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { addAcceptedNegotiationToCart } from "@/src/modules/wholesale/server/negotiations";
+export async function POST(request: Request, { params }: { params: Promise<{ negotiationId: string }> }) { try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); } const user = await getCurrentAppwriteUser(); if (!user) return new Response("Unauthorized", { status: 401 }); const { negotiationId } = await params; try { await addAcceptedNegotiationToCart(user.$id, negotiationId); return Response.redirect(publicAppUrl("/cart?negotiated=1"), 303); } catch { return Response.redirect(publicAppUrl(`/wholesale/negotiations/${negotiationId}?cartError=1`), 303); } }

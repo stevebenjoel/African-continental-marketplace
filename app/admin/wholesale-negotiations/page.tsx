@@ -1,0 +1,5 @@
+import Link from "next/link";
+import { requireSuperAdmin } from "@/src/modules/authorization/server/require-super-admin";
+import { listAllNegotiations } from "@/src/modules/wholesale/server/negotiations";
+export const dynamic = "force-dynamic";
+export default async function AdminWholesaleNegotiations() { await requireSuperAdmin(); const rows = await listAllNegotiations(); return <main className="admin-detail"><header><div><p className="kicker">WHOLESALE GOVERNANCE</p><h1>Price negotiation monitor</h1><p>Immutable commercial history for dispute, fraud and marketplace oversight.</p></div><Link href="/admin">Back to overview</Link></header><section className="review-table"><div className="review-row review-head"><span>Reference</span><span>Product</span><span>Buyer / seller</span><span>Status</span></div>{rows.documents.map(row => <div className="review-row" key={row.$id}><span>{String(row.negotiationNumber)}</span><strong>{String(row.productName)}</strong><span>{String(row.buyerUserId).slice(0, 8)} / {String(row.vendorId).slice(0, 8)}</span><span>{String(row.status).replaceAll("_", " ")}</span></div>)}</section></main>; }

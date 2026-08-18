@@ -17,6 +17,7 @@ const modules = [
   ,{ name: "Analytics", value: "Live dashboards", note: "Marketplace operating metrics", href: "/admin/analytics" }
   ,{ name: "Coupons", value: "Promotion controls", note: "Discount campaigns and usage", href: "/admin/coupons" }
   ,{ name: "Business Buyers", value: "Wholesale approvals", note: "Institutional and bulk buyer compliance", href: "/admin/business-buyers" }
+  ,{ name: "Wholesale Negotiations", value: "Commercial oversight", note: "Monitor buyer and seller price negotiations", href: "/admin/wholesale-negotiations" }
   ,{ name: "RFQ Procurement", value: "Trade sourcing active", note: "Supplier matching and quotations", href: "/admin/rfqs" }
   ,{ name: "Warehousing", value: "Fulfilment centre active", note: "Inbound, put-away, picking and packing", href: "/admin/warehousing" }
   ,{ name: "Logistics", value: "Carrier marketplace active", note: "Carrier verification, rates, dispatch and tracking", href: "/admin/logistics" }
