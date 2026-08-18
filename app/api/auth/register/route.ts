@@ -2,7 +2,7 @@ import { ID } from "node-appwrite";
 import { NextResponse } from "next/server";
 import { createAppwriteAuthClient } from "@/src/integrations/appwrite/server";
 import { registrationSchema } from "@/src/modules/auth/domain/credentials";
-import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import { assertSameOrigin, publicAppUrl } from "@/src/modules/auth/server/request-security";
 import { sessionCookieOptions } from "@/src/modules/auth/server/session";
 import { env } from "@/src/shared/config/env";
 import { createAppwriteSessionClient } from "@/src/integrations/appwrite/server";
@@ -19,10 +19,10 @@ export async function POST(request: Request) {
     try {
       await createAppwriteSessionClient(session.secret).account.createEmailVerification({ url: `${env().APP_BASE_URL}/verify-email` });
     } catch { /* Account creation succeeds even when SMTP or the callback platform is not configured yet. */ }
-    const response = NextResponse.redirect(new URL("/account?welcome=1", request.url), 303);
+    const response = NextResponse.redirect(publicAppUrl("/account?welcome=1"), 303);
     response.cookies.set(env().SESSION_COOKIE_NAME, session.secret, sessionCookieOptions(session.expire));
     return response;
   } catch {
-    return NextResponse.redirect(new URL("/register?error=registration_failed", request.url), 303);
+    return NextResponse.redirect(publicAppUrl("/register?error=registration_failed"), 303);
   }
 }

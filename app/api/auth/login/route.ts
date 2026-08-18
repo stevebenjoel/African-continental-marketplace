@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loginSchema } from "@/src/modules/auth/domain/credentials";
-import { assertSameOrigin, safeReturnTo } from "@/src/modules/auth/server/request-security";
+import { assertSameOrigin, publicAppUrl, safeReturnTo } from "@/src/modules/auth/server/request-security";
 import { sessionCookieOptions } from "@/src/modules/auth/server/session";
 import { env } from "@/src/shared/config/env";
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const sessionCookie = appwriteResponse.headers.getSetCookie().find((value) => value.startsWith(`a_session_${config.APPWRITE_PROJECT_ID}=`));
     const sessionSecret = sessionCookie?.slice(sessionCookie.indexOf("=") + 1, sessionCookie.indexOf(";"));
     if (!sessionSecret) throw new Error("Appwrite did not return a server session cookie");
-    const response = NextResponse.redirect(new URL(safeReturnTo(form.get("returnTo")), config.APP_BASE_URL), 303);
+    const response = NextResponse.redirect(publicAppUrl(safeReturnTo(form.get("returnTo"))), 303);
     response.cookies.set(config.SESSION_COOKIE_NAME, decodeURIComponent(sessionSecret), sessionCookieOptions(session.expire));
     return response;
   } catch (error) {
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     } : { message: "Unknown login failure" };
     console.error("Appwrite login failed", diagnostic);
     const config = env();
-    const failureUrl = new URL("/login?error=invalid_credentials", config.APP_BASE_URL);
+    const failureUrl = publicAppUrl("/login?error=invalid_credentials");
     if (config.NODE_ENV === "development") failureUrl.searchParams.set("reason", String(diagnostic.type ?? diagnostic.code ?? diagnostic.message ?? "unknown"));
     return NextResponse.redirect(failureUrl, 303);
   }

@@ -14,3 +14,7 @@ export function safeReturnTo(value: FormDataEntryValue | null): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/account";
   return value;
 }
+
+export function publicAppUrl(path: string): URL {
+  return new URL(path, env().APP_BASE_URL);
+}
