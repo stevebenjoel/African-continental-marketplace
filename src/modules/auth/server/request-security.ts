@@ -16,5 +16,7 @@ export function safeReturnTo(value: FormDataEntryValue | null): string {
 }
 
 export function publicAppUrl(path: string): URL {
-  return new URL(path, env().APP_BASE_URL);
+  const base = new URL(env().APP_BASE_URL);
+  const target = new URL(path, base);
+  return target.origin === base.origin ? target : base;
 }

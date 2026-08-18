@@ -1,5 +1,5 @@
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
-import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import {assertSameOrigin, publicAppUrl} from "@/src/modules/auth/server/request-security";
 import { findVendorByOwner } from "@/src/modules/vendors/server/repository";
 import { submitTradePassport } from "@/src/modules/trade/server/repository";
 
@@ -13,6 +13,6 @@ export async function POST(request: Request) {
   const form = await request.formData();
   try {
     await submitTradePassport({ vendorId: vendor.$id, ownerUserId: user.$id, exporterNumber: value(form, "exporterNumber"), targetCountries: value(form, "targetCountries"), productCategories: value(form, "productCategories"), incoterms: value(form, "incoterms"), transportModes: value(form, "transportModes") });
-    return Response.redirect(new URL("/seller/trade?submitted=1", request.url), 303);
-  } catch (error) { console.error("Trade passport submission failed", error); return Response.redirect(new URL("/seller/trade?error=passport", request.url), 303); }
+    return Response.redirect(publicAppUrl("/seller/trade?submitted=1"), 303);
+  } catch (error) { console.error("Trade passport submission failed", error); return Response.redirect(publicAppUrl("/seller/trade?error=passport"), 303); }
 }

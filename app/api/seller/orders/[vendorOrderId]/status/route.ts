@@ -1,5 +1,5 @@
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
-import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import {assertSameOrigin, publicAppUrl} from "@/src/modules/auth/server/request-security";
 import { transitionVendorOrder } from "@/src/modules/orders/server/fulfilment";
 import { findVendorByOwner } from "@/src/modules/vendors/server/repository";
 
@@ -12,6 +12,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ven
   const [{ vendorOrderId }, form] = await Promise.all([params, request.formData()]);
   try {
     await transitionVendorOrder({ vendorId: vendor.$id, vendorOrderId, actorUserId: user.$id, nextStatus: String(form.get("status") ?? ""), carrier: String(form.get("carrier") ?? ""), trackingNumber: String(form.get("trackingNumber") ?? ""), trackingUrl: String(form.get("trackingUrl") ?? "") });
-    return Response.redirect(new URL(`/seller/orders/${vendorOrderId}?updated=1`, request.url), 303);
-  } catch (error) { console.error("Order transition failed", error); return Response.redirect(new URL(`/seller/orders/${vendorOrderId}?error=1`, request.url), 303); }
+    return Response.redirect(publicAppUrl(`/seller/orders/${vendorOrderId}?updated=1`), 303);
+  } catch (error) { console.error("Order transition failed", error); return Response.redirect(publicAppUrl(`/seller/orders/${vendorOrderId}?error=1`), 303); }
 }

@@ -1,5 +1,5 @@
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
-import { assertSameOrigin } from "@/src/modules/auth/server/request-security";
+import {assertSameOrigin, publicAppUrl} from "@/src/modules/auth/server/request-security";
 import { checkout } from "@/src/modules/checkout/server/checkout";
 import { isPaymentProvider, startPayment } from "@/src/modules/payments/server/providers";
 
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (!isPaymentProvider(provider)) return new Response("Invalid payment method", { status: 400 });
   let orderId: string;
   try { orderId = await checkout(user.$id, String(form.get("addressId")), String(form.get("couponCode") ?? "")); }
-  catch (error) { console.error("Checkout failed", error); return Response.redirect(new URL("/cart?checkoutError=1", request.url), 303); }
-  try { const destination = await startPayment({ userId: user.$id, email: user.email, orderId, provider, origin: new URL(request.url).origin }); return Response.redirect(destination, 303); }
-  catch (error) { console.error("Checkout payment start failed", error); return Response.redirect(new URL(`/orders/${orderId}?created=1&paymentError=${encodeURIComponent(provider)}`, request.url), 303); }
+  catch (error) { console.error("Checkout failed", error); return Response.redirect(publicAppUrl("/cart?checkoutError=1"), 303); }
+  try { const destination = await startPayment({ userId: user.$id, email: user.email, orderId, provider, origin: publicAppUrl("/").origin }); return Response.redirect(destination, 303); }
+  catch (error) { console.error("Checkout payment start failed", error); return Response.redirect(publicAppUrl(`/orders/${orderId}?created=1&paymentError=${encodeURIComponent(provider)}`), 303); }
 }
