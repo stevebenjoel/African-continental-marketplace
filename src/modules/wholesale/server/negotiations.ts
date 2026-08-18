@@ -17,7 +17,13 @@ export const listBuyerNegotiations = (buyerUserId: string) => db().listDocuments
 export const listVendorNegotiations = (vendorId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "price_negotiations", queries: [Query.equal("vendorId", vendorId), Query.orderDesc("updatedAt"), Query.limit(100)] });
 export const listAllNegotiations = () => db().listDocuments({ databaseId: databaseId(), collectionId: "price_negotiations", queries: [Query.orderDesc("updatedAt"), Query.limit(200)] });
 export const listNegotiationOffers = (negotiationId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "negotiation_offers", queries: [Query.equal("negotiationId", negotiationId), Query.orderAsc("sequence"), Query.limit(100)] });
-export const getNegotiationSettings = (offerId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "negotiation_settings", queries: [Query.equal("offerId", offerId), Query.limit(1)] }).then(result => result.documents[0] ?? null);
+export async function getNegotiationSettings(offerId: string) {
+  const database = db(), [result, offer] = await Promise.all([
+    database.listDocuments({ databaseId: databaseId(), collectionId: "negotiation_settings", queries: [Query.equal("offerId", offerId), Query.limit(1)] }),
+    database.getDocument({ databaseId: databaseId(), collectionId: "seller_offers", documentId: offerId })
+  ]);
+  return result.documents[0] ?? { offerId, vendorId: offer.vendorId, enabled: "true", minimumQuantity: offer.minimumOrderQuantity, expiryHours: 48, allowCounteroffers: "true" };
+}
 
 export async function getNegotiationForParticipant(negotiationId: string, userId: string, vendorId?: string) {
   const negotiation = await db().getDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: negotiationId });
@@ -41,8 +47,8 @@ export async function createNegotiation(input: { buyerUserId: string; offerId: s
     database.getDocument({ databaseId: databaseId(), collectionId: "seller_offers", documentId: input.offerId }),
     database.listDocuments({ databaseId: databaseId(), collectionId: "negotiation_settings", queries: [Query.equal("offerId", input.offerId), Query.limit(1)] })
   ]);
-  const settings = settingsResult.documents[0];
-  if (offer.status !== "approved" || !settings || settings.enabled !== "true") throw new Error("Negotiation is unavailable");
+  const settings = settingsResult.documents[0] ?? { enabled: "true", minimumQuantity: offer.minimumOrderQuantity, expiryHours: 48, allowCounteroffers: "true" };
+  if (offer.status !== "approved" || settings.enabled !== "true") throw new Error("Negotiation is unavailable");
   const [product, vendor] = await Promise.all([
     database.getDocument({ databaseId: databaseId(), collectionId: "products", documentId: String(offer.productId) }),
     database.getDocument({ databaseId: databaseId(), collectionId: "vendors", documentId: String(offer.vendorId) })
