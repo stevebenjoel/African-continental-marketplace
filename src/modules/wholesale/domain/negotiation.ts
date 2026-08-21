@@ -3,6 +3,9 @@ export type NegotiationStatus = (typeof negotiationStatuses)[number];
 export type NegotiationActor = "buyer" | "seller";
 export type NegotiationAction = "accept" | "reject" | "counter" | "withdraw";
 
+const platformVendorIds = new Set(["pacsm-demo-vendor", "pacsm-platform"]);
+export function canSuperAdminRespondForVendor(vendorId: string) { return platformVendorIds.has(vendorId); }
+
 export function negotiationTurn(status: NegotiationStatus): NegotiationActor | null {
   if (status === "submitted" || status === "buyer_countered") return "seller";
   if (status === "seller_countered") return "buyer";

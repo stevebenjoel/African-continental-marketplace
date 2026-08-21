@@ -17,6 +17,7 @@ export const listBuyerNegotiations = (buyerUserId: string) => db().listDocuments
 export const listVendorNegotiations = (vendorId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "price_negotiations", queries: [Query.equal("vendorId", vendorId), Query.orderDesc("updatedAt"), Query.limit(100)] });
 export const listAllNegotiations = () => db().listDocuments({ databaseId: databaseId(), collectionId: "price_negotiations", queries: [Query.orderDesc("updatedAt"), Query.limit(200)] });
 export const listNegotiationOffers = (negotiationId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "negotiation_offers", queries: [Query.equal("negotiationId", negotiationId), Query.orderAsc("sequence"), Query.limit(100)] });
+export async function getNegotiationForAdmin(negotiationId: string) { return { negotiation: await db().getDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: negotiationId }), offers: (await listNegotiationOffers(negotiationId)).documents }; }
 export async function getNegotiationSettings(offerId: string) {
   const database = db(), [result, offer] = await Promise.all([
     database.listDocuments({ databaseId: databaseId(), collectionId: "negotiation_settings", queries: [Query.equal("offerId", offerId), Query.limit(1)] }),
@@ -63,7 +64,7 @@ export async function createNegotiation(input: { buyerUserId: string; offerId: s
   return negotiationId;
 }
 
-export async function respondToNegotiation(input: { negotiationId: string; actorUserId: string; actor: NegotiationActor; vendorId?: string; action: "accept" | "reject" | "counter" | "withdraw"; unitPriceMinor?: number; quantity?: number; message: string }) {
+export async function respondToNegotiation(input: { negotiationId: string; actorUserId: string; actor: NegotiationActor; eventActorRole?: "buyer" | "seller" | "admin_proxy"; vendorId?: string; action: "accept" | "reject" | "counter" | "withdraw"; unitPriceMinor?: number; quantity?: number; message: string }) {
   const database = db(), negotiation = await database.getDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId });
   if (input.actor === "buyer" ? negotiation.buyerUserId !== input.actorUserId : negotiation.vendorId !== input.vendorId) throw new Error("Negotiation not found");
   if (new Date(String(negotiation.expiresAt)) <= new Date()) { await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, data: { status: "expired", updatedAt: now() } }); throw new Error("Negotiation expired"); }
@@ -83,7 +84,7 @@ export async function respondToNegotiation(input: { negotiationId: string; actor
     await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, data: { status, actionRequiredBy: "", ...(status === "accepted" ? { acceptedAt: occurredAt } : {}), updatedAt: occurredAt } });
     await notify(recipient, `Wholesale negotiation ${status}`, `${negotiation.productName}: ${input.message.trim() || status}.`, recipientHref);
   }
-  await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_events", documentId: ID.unique(), permissions: [], data: { negotiationId: input.negotiationId, actorUserId: input.actorUserId, actorRole: input.actor, eventType: input.action, message: input.message.trim(), occurredAt } });
+  await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_events", documentId: ID.unique(), permissions: [], data: { negotiationId: input.negotiationId, actorUserId: input.actorUserId, actorRole: input.eventActorRole ?? input.actor, eventType: input.action, message: input.message.trim(), occurredAt } });
 }
 
 export async function addAcceptedNegotiationToCart(userId: string, negotiationId: string) {
