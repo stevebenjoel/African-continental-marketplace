@@ -7,7 +7,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <section className="auth-panel"><div className="auth-card">
       <p className="kicker">WELCOME BACK</p><h1>Sign in to PAC-SM.</h1>
       {params.recovered && <p className="success-note" role="status">Your password has been updated. You can sign in now.</p>}
-      {params.error && <p className="form-error" role="alert">We could not sign you in. Check your details and try again.</p>}
+      {params.error && <p className="form-error" role="alert">{params.error.startsWith("oauth_") ? "Google sign-in was not completed. Please try again or use your email and password." : "We could not sign you in. Check your details and try again."}</p>}
+      <a className="oauth-button" href={`/api/auth/oauth/google?returnTo=${encodeURIComponent(params.returnTo ?? "/account")}`}><span aria-hidden="true">G</span> Continue with Google</a>
+      <div className="auth-divider"><span>or use email</span></div>
       <form action="/api/auth/login" method="post">
         <input type="hidden" name="returnTo" value={params.returnTo ?? "/account"} />
         <label>Email address<input name="email" type="email" autoComplete="email" required maxLength={320} /></label>

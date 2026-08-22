@@ -10,7 +10,10 @@ export async function POST(request: Request) {
   const session = (await cookies()).get(config.SESSION_COOKIE_NAME)?.value;
   if (!session) return NextResponse.redirect(publicAppUrl("/login?returnTo=/account"), 303);
   try {
-    await createAppwriteSessionClient(session).account.createEmailVerification({ url: `${config.APP_BASE_URL}/verify-email` });
+    const account = createAppwriteSessionClient(session).account;
+    const user = await account.get();
+    if (user.emailVerification) return NextResponse.redirect(publicAppUrl("/account?verification=already"), 303);
+    await account.createEmailVerification({ url: publicAppUrl("/verify-email").toString() });
     return NextResponse.redirect(publicAppUrl("/account?verification=sent"), 303);
   } catch {
     return NextResponse.redirect(publicAppUrl("/account?verification=failed"), 303);

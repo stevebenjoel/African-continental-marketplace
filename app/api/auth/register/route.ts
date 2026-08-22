@@ -16,10 +16,11 @@ export async function POST(request: Request) {
     await account.create({ userId: ID.unique(), ...input });
     const session = await account.createEmailPasswordSession({ email: input.email, password: input.password });
     if (!session.secret) throw new Error("Missing Appwrite server session secret");
+    let verification = "sent";
     try {
-      await createAppwriteSessionClient(session.secret).account.createEmailVerification({ url: `${env().APP_BASE_URL}/verify-email` });
-    } catch { /* Account creation succeeds even when SMTP or the callback platform is not configured yet. */ }
-    const response = NextResponse.redirect(publicAppUrl("/account?welcome=1"), 303);
+      await createAppwriteSessionClient(session.secret).account.createEmailVerification({ url: publicAppUrl("/verify-email").toString() });
+    } catch { verification = "unavailable"; }
+    const response = NextResponse.redirect(publicAppUrl(`/account?welcome=1&verification=${verification}`), 303);
     response.cookies.set(env().SESSION_COOKIE_NAME, session.secret, sessionCookieOptions(session.expire));
     return response;
   } catch {

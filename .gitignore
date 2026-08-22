@@ -1,5 +1,7 @@
 node_modules/
 .next/
+.next-*/
+.next.*/
 *.tsbuildinfo
 .env
 .env.local
@@ -7,6 +9,8 @@ node_modules/
 .dev-server*.log
 .preview*.log
 coverage/
+playwright-report/
+test-results/
 dist/
 .DS_Store
 .codex/

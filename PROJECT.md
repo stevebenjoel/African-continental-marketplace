@@ -176,6 +176,10 @@ The brand should feel modern, trustworthy, energetic, inclusive, and unmistakabl
 
 ## Current Status
 
-**Stage:** Concept definition
+**Stage:** Pilot production readiness
 
-**Next recommended action:** Select the pilot market and initial marketplace focus, then convert this concept into a detailed product requirements document.
+The application framework now includes retail, wholesale, seller onboarding, KYC/KYB, procurement, off-takers, payments, fulfilment, warehousing, logistics, trade compliance, role-separated administration, localization and Appwrite-backed authentication. New major modules are temporarily subordinate to stabilizing the controlled pilot.
+
+**Current release gate:** TypeScript, ESLint, domain tests, production build and local desktop/mobile Playwright acceptance tests must pass before a pilot release. PAC-SM currently uses the one provided Appwrite backend; no staging environment has been created.
+
+**Next recommended action:** Activate Appwrite SMTP and Google OAuth on the configured backend, execute the authentication acceptance checklist in `docs/PILOT-READINESS.md`, then begin the product-media and catalogue-quality stage. A separate staging environment remains an optional future risk-control decision and is not assumed to exist.

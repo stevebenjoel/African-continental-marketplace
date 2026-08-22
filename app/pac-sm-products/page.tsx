@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listPacsmProducts } from "@/src/modules/catalogue/server/repository";
 import { getCurrencyDisplay } from "@/src/modules/localization/server/currency";
+import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function PacsmProductsPage() {
     </section>
     <section className="product-grid">
       {products.length ? products.map(item => item && <Link href={`/products/${String(item.product.slug)}`} key={item.product.$id}><article>
-        <div className="product-placeholder">{String(item.product.name).slice(0, 2).toUpperCase()}</div>
+        <ProductImage media={item.media} productName={String(item.product.name)} className="product-placeholder"/>
         <span>{Number(item.offer.minimumOrderQuantity) > 1 ? `WHOLESALE · MOQ ${String(item.offer.minimumOrderQuantity)}` : "PAC-SM RETAIL"}</span>
         <h2>{String(item.product.name)}</h2>
         <p>{String(item.product.description)}</p>

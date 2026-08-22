@@ -19,6 +19,10 @@ export function createAppwriteAdminClient(scope: "auth" | "storage" | "database"
 export const createAppwriteAuthClient = () => createAppwriteAdminClient("auth");
 export const createAppwriteDatabaseClient = () => createAppwriteAdminClient("database");
 
+export function createAppwritePublicAccountClient() {
+  return { account: new Account(baseClient()) };
+}
+
 export function createAppwriteSessionClient(sessionSecret: string) {
   const client = baseClient().setSession(sessionSecret);
   return { account: new Account(client) };

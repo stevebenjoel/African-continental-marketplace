@@ -4,6 +4,7 @@ import { getCart } from "@/src/modules/cart/server/repository";
 import { listCategories, listPublicProducts } from "@/src/modules/catalogue/server/repository";
 import { getCurrencyDisplay, type CurrencyDisplay } from "@/src/modules/localization/server/currency";
 import { getTranslator } from "@/src/modules/localization/server/language";
+import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ type ProductRow = NonNullable<Awaited<ReturnType<typeof listPublicProducts>>[num
 function ProductCard({ item, index, pricing }: { item: ProductRow; index: number; pricing: CurrencyDisplay }) {
   const wholesale = Number(item.offer.minimumOrderQuantity) > 1;
   return <Link className="home-product" href={`/products/${String(item.product.slug)}`}>
-    <div className={`home-product-art art-${index % 6}`}><span>{String(item.product.name).slice(0, 2).toUpperCase()}</span><small>{String(item.product.countryOfOrigin)}</small></div>
+    <ProductImage media={item.media} productName={String(item.product.name)} className={`home-product-art art-${index % 6}`} />
     <div className="home-product-body"><span className={`market-badge ${wholesale ? "bulk" : "retail"}`}>{wholesale ? `Wholesale · MOQ ${item.offer.minimumOrderQuantity}` : "Retail"}</span><h3>{String(item.product.name)}</h3><div className="rating">★★★★★ <span>Verified offer</span></div><strong>{pricing.format(Number(item.offer.retailPriceMinor), String(item.offer.currency))}</strong><p>{item.available > 0 ? `${item.available} available` : "Restocking soon"}</p></div>
   </Link>;
 }

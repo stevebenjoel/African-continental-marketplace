@@ -4,6 +4,7 @@ import { getPublicProduct } from "@/src/modules/catalogue/server/repository";
 import { listProductReviews } from "@/src/modules/engagement/server/reviews";
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { getCurrencyDisplay } from "@/src/modules/localization/server/currency";
+import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   return <main className="marketplace-shell">
     <nav><Link className="brand" href="/"><span>PAC</span><b>SM</b></Link><div><Link href="/products">All products</Link> · <Link href="/wishlist">Wishlist</Link> · <Link href="/cart">Cart</Link></div></nav>
     <section className="product-detail">
-      <div className="product-hero-mark">{String(data.product.name).slice(0, 2).toUpperCase()}</div>
+      <div className="product-gallery"><ProductImage media={data.media[0]} productName={String(data.product.name)} className="product-hero-mark"/>{data.media.length > 1 && <div className="product-thumbnails">{data.media.map(media => <ProductImage key={media.$id} media={media} productName={String(data.product.name)} className="product-thumbnail"/>)}</div>}</div>
       <div><p className="kicker">{String(data.product.brandName ?? "VERIFIED PRODUCT")}</p><h1>{String(data.product.name)}</h1><p className="product-description">{String(data.product.description)}</p><p>{reviews.total ? `${average.toFixed(1)} / 5 from ${reviews.total} verified review(s)` : "No reviews yet"}</p><dl><dt>Country of origin</dt><dd>{String(data.product.countryOfOrigin)}</dd><dt>Model</dt><dd>{String(data.product.model ?? "Not specified")}</dd></dl>{user ? <form action="/api/wishlist" method="post"><input type="hidden" name="productId" value={data.product.$id}/><input type="hidden" name="returnTo" value={`/products/${slug}?saved=1`}/><button type="submit">Save to wishlist</button></form> : <Link href={`/login?returnTo=/products/${slug}`}>Sign in to save</Link>}{query.saved && <p className="success-note">Saved to your wishlist.</p>}</div>
     </section>
     <section className="offer-list"><h2>Seller offers · displayed in {pricing.currency}</h2>{data.offers.map(({ offer, store, available }) => <article key={offer.$id}><div><strong>{String(store.name)}</strong><Link href={`/store/${String(store.slug)}`}>View store</Link></div><div><span>{Number(offer.minimumOrderQuantity) > 1 ? `Wholesale · MOQ ${String(offer.minimumOrderQuantity)}` : "Retail"}</span><strong>{pricing.format(Number(offer.retailPriceMinor), String(offer.currency))}</strong><span>{available > 0 ? `${available} in stock` : "Out of stock"}</span><form method="post" action="/api/cart/items"><input type="hidden" name="offerId" value={offer.$id}/><input type="hidden" name="productSlug" value={slug}/><input aria-label="Quantity" name="quantity" type="number" min={Number(offer.minimumOrderQuantity)} max={available} defaultValue={Number(offer.minimumOrderQuantity)}/><button disabled={available < Number(offer.minimumOrderQuantity)}>Add to cart</button></form></div></article>)}</section>
