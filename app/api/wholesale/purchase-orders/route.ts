@@ -1,1 +1,17 @@
-import{getCurrentAppwriteUser}from"@/src/modules/auth/server/session";import {assertSameOrigin, publicAppUrl} from "@/src/modules/auth/server/request-security";import{createPurchaseOrder}from"@/src/modules/wholesale/server/repository";export async function POST(request:Request){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await getCurrentAppwriteUser();if(!user)return Response.redirect(publicAppUrl("/login?returnTo=/wholesale"),303);const f=await request.formData();try{await createPurchaseOrder({userId:user.$id,offerId:String(f.get("offerId")),quantity:Number(f.get("quantity"))});return Response.redirect(publicAppUrl("/wholesale?ordered=1#purchase-orders"),303)}catch(error){console.error("Wholesale purchase order failed",error);return Response.redirect(publicAppUrl("/wholesale?orderError=1"),303)}}
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin, publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { createListedWholesaleCheckout } from "@/src/modules/wholesale/server/checkout-cart";
+
+export async function POST(request: Request) {
+  try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); }
+  const user = await getCurrentAppwriteUser();
+  if (!user) return Response.redirect(publicAppUrl("/login?returnTo=/wholesale"), 303);
+  const form = await request.formData();
+  try {
+    await createListedWholesaleCheckout(user.$id, String(form.get("offerId")), Number(form.get("quantity")));
+    return Response.redirect(publicAppUrl("/checkout?wholesale=listed"), 303);
+  } catch (error) {
+    console.error("Listed wholesale checkout failed", error);
+    return Response.redirect(publicAppUrl("/wholesale?orderError=1"), 303);
+  }
+}
