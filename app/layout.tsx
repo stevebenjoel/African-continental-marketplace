@@ -9,6 +9,7 @@ import "./catalogue.css";
 import "./inventory.css";
 import "./marketplace.css";
 import "./wholesale.css";
+import "./retail-marketplace.css";
 import "./cart.css";
 import "./home-lanes.css";
 import "./commerce-home.css";
