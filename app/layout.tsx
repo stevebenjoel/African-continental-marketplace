@@ -8,6 +8,7 @@ import "./seller.css";
 import "./catalogue.css";
 import "./inventory.css";
 import "./marketplace.css";
+import "./wholesale.css";
 import "./cart.css";
 import "./home-lanes.css";
 import "./commerce-home.css";
