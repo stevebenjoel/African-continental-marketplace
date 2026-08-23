@@ -3,7 +3,7 @@ import { ID, Query } from "node-appwrite";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
 import { findBusinessBuyer } from "@/src/modules/wholesale/server/repository";
-import { assertNegotiationAction, isAcceptedNegotiationUsable, validateNegotiatedPrice, type NegotiationActor, type NegotiationStatus } from "@/src/modules/wholesale/domain/negotiation";
+import { assertNegotiationAction, isAcceptedNegotiationUsable, NegotiationActionError, validateNegotiatedPrice, type NegotiationActor, type NegotiationStatus } from "@/src/modules/wholesale/domain/negotiation";
 
 const databaseId = () => env().APPWRITE_DATABASE_ID;
 const db = () => createAppwriteDatabaseClient().databases;
@@ -66,25 +66,39 @@ export async function createNegotiation(input: { buyerUserId: string; offerId: s
 
 export async function respondToNegotiation(input: { negotiationId: string; actorUserId: string; actor: NegotiationActor; eventActorRole?: "buyer" | "seller" | "admin_proxy"; vendorId?: string; action: "accept" | "reject" | "counter" | "withdraw"; unitPriceMinor?: number; quantity?: number; message: string }) {
   const database = db(), negotiation = await database.getDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId });
-  if (input.actor === "buyer" ? negotiation.buyerUserId !== input.actorUserId : negotiation.vendorId !== input.vendorId) throw new Error("Negotiation not found");
-  if (new Date(String(negotiation.expiresAt)) <= new Date()) { await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, data: { status: "expired", updatedAt: now() } }); throw new Error("Negotiation expired"); }
+  if (input.actor === "buyer" ? negotiation.buyerUserId !== input.actorUserId : negotiation.vendorId !== input.vendorId) throw new NegotiationActionError("unavailable");
+  if (new Date(String(negotiation.expiresAt)) <= new Date()) { await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, data: { status: "expired", actionRequiredBy: "", updatedAt: now() } }); throw new NegotiationActionError("expired"); }
   assertNegotiationAction(String(negotiation.status) as NegotiationStatus, input.actor, input.action);
   const occurredAt = now(), recipient = input.actor === "buyer" ? String(negotiation.sellerUserId) : String(negotiation.buyerUserId), recipientHref = input.actor === "buyer" ? `/seller/wholesale/negotiations/${input.negotiationId}` : `/wholesale/negotiations/${input.negotiationId}`;
+  let counter: { unitPriceMinor: number; quantity: number } | undefined;
   if (input.action === "counter") {
-    const settingsResult = await database.listDocuments({ databaseId: databaseId(), collectionId: "negotiation_settings", queries: [Query.equal("offerId", String(negotiation.offerId)), Query.limit(1)] }), settings = settingsResult.documents[0];
-    if (!settings || settings.allowCounteroffers !== "true") throw new Error("Counteroffers are disabled");
+    const [settingsResult, offer] = await Promise.all([
+      database.listDocuments({ databaseId: databaseId(), collectionId: "negotiation_settings", queries: [Query.equal("offerId", String(negotiation.offerId)), Query.limit(1)] }),
+      database.getDocument({ databaseId: databaseId(), collectionId: "seller_offers", documentId: String(negotiation.offerId) })
+    ]);
+    const settings = settingsResult.documents[0] ?? { allowCounteroffers: "true", minimumQuantity: offer.minimumOrderQuantity };
+    if (settings.allowCounteroffers !== "true") throw new NegotiationActionError("counter_disabled");
     const unitPriceMinor = Number(input.unitPriceMinor), quantity = Number(input.quantity);
     validateNegotiatedPrice({ unitPriceMinor, quantity, regularUnitPriceMinor: Number(negotiation.regularUnitPriceMinor), minimumQuantity: Number(settings.minimumQuantity), ...(input.actor === "seller" && settings.floorUnitPriceMinor ? { floorUnitPriceMinor: Number(settings.floorUnitPriceMinor) } : {}), ...(input.actor === "seller" && settings.maximumDiscountBasisPoints ? { maximumDiscountBasisPoints: Number(settings.maximumDiscountBasisPoints) } : {}) });
-    const offers = await listNegotiationOffers(input.negotiationId), sequence = offers.total + 1, status = input.actor === "seller" ? "seller_countered" : "buyer_countered", actionRequiredBy = input.actor === "seller" ? "buyer" : "seller";
-    await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_offers", documentId: ID.unique(), permissions: [], data: { negotiationId: input.negotiationId, sequence, proposedBy: input.actor, actorUserId: input.actorUserId, unitPriceMinor, quantity, currency: negotiation.currency, message: input.message.trim(), validUntil: negotiation.expiresAt, createdAt: occurredAt } });
-    await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, data: { currentUnitPriceMinor: unitPriceMinor, quantity, status, actionRequiredBy, updatedAt: occurredAt } });
-    await notify(recipient, "Wholesale counteroffer received", `${negotiation.productName}: a new counteroffer requires your response.`, recipientHref);
-  } else {
-    const status = input.action === "accept" ? "accepted" : input.action === "reject" ? "rejected" : "withdrawn";
-    await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, data: { status, actionRequiredBy: "", ...(status === "accepted" ? { acceptedAt: occurredAt } : {}), updatedAt: occurredAt } });
-    await notify(recipient, `Wholesale negotiation ${status}`, `${negotiation.productName}: ${input.message.trim() || status}.`, recipientHref);
+    counter = { unitPriceMinor, quantity };
   }
-  await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_events", documentId: ID.unique(), permissions: [], data: { negotiationId: input.negotiationId, actorUserId: input.actorUserId, actorRole: input.eventActorRole ?? input.actor, eventType: input.action, message: input.message.trim(), occurredAt } });
+  const transaction = await database.createTransaction({ ttl: 120 });
+  try {
+    if (counter) {
+      const offers = await database.listDocuments({ databaseId: databaseId(), collectionId: "negotiation_offers", queries: [Query.equal("negotiationId", input.negotiationId), Query.limit(100)], transactionId: transaction.$id }), sequence = offers.total + 1, status = input.actor === "seller" ? "seller_countered" : "buyer_countered", actionRequiredBy = input.actor === "seller" ? "buyer" : "seller";
+      await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_offers", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { negotiationId: input.negotiationId, sequence, proposedBy: input.actor, actorUserId: input.actorUserId, unitPriceMinor: counter.unitPriceMinor, quantity: counter.quantity, currency: negotiation.currency, message: input.message.trim(), validUntil: negotiation.expiresAt, createdAt: occurredAt } });
+      await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, transactionId: transaction.$id, data: { currentUnitPriceMinor: counter.unitPriceMinor, quantity: counter.quantity, status, actionRequiredBy, updatedAt: occurredAt } });
+    } else {
+      const status = input.action === "accept" ? "accepted" : input.action === "reject" ? "rejected" : "withdrawn";
+      await database.updateDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: input.negotiationId, transactionId: transaction.$id, data: { status, actionRequiredBy: "", ...(status === "accepted" ? { acceptedAt: occurredAt } : {}), updatedAt: occurredAt } });
+    }
+    await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_events", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { negotiationId: input.negotiationId, actorUserId: input.actorUserId, actorRole: input.eventActorRole ?? input.actor, eventType: input.action, message: input.message.trim(), occurredAt } });
+    await notify(recipient, input.action === "counter" ? "Wholesale counteroffer received" : `Wholesale negotiation ${input.action === "accept" ? "accepted" : input.action === "reject" ? "rejected" : "withdrawn"}`, input.action === "counter" ? `${negotiation.productName}: a new counteroffer requires your response.` : `${negotiation.productName}: ${input.message.trim() || input.action}.`, recipientHref, transaction.$id);
+    await database.updateTransaction({ transactionId: transaction.$id, commit: true });
+  } catch (error) {
+    await database.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function addAcceptedNegotiationToCart(userId: string, negotiationId: string) {

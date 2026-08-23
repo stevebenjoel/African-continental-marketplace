@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { assertNegotiationAction, canSuperAdminRespondForVendor, negotiationTurn, validateNegotiatedPrice } from "../../src/modules/wholesale/domain/negotiation.ts";
+import { assertNegotiationAction, canSuperAdminRespondForVendor, negotiationErrorCode, negotiationTurn, validateNegotiatedPrice } from "../../src/modules/wholesale/domain/negotiation.ts";
 
 describe("wholesale price negotiation", () => {
   it("enforces alternating buyer and seller turns", () => {
@@ -8,6 +8,19 @@ describe("wholesale price negotiation", () => {
     assert.equal(negotiationTurn("seller_countered"), "buyer");
     assert.doesNotThrow(() => assertNegotiationAction("submitted", "seller", "accept"));
     assert.throws(() => assertNegotiationAction("submitted", "buyer", "accept"));
+    assert.doesNotThrow(() => assertNegotiationAction("seller_countered", "buyer", "accept"));
+    assert.doesNotThrow(() => assertNegotiationAction("seller_countered", "buyer", "reject"));
+    assert.doesNotThrow(() => assertNegotiationAction("seller_countered", "buyer", "counter"));
+    assert.doesNotThrow(() => assertNegotiationAction("buyer_countered", "seller", "accept"));
+    assert.doesNotThrow(() => assertNegotiationAction("buyer_countered", "seller", "reject"));
+    assert.doesNotThrow(() => assertNegotiationAction("buyer_countered", "seller", "counter"));
+    assert.throws(() => assertNegotiationAction("accepted", "seller", "counter"));
+  });
+
+  it("returns safe actionable error codes", () => {
+    try { assertNegotiationAction("seller_countered", "seller", "accept"); }
+    catch (error) { assert.equal(negotiationErrorCode(error), "not_your_turn"); }
+    assert.equal(negotiationErrorCode(new Error("database detail")), "unavailable");
   });
 
   it("enforces seller price and discount controls", () => {
