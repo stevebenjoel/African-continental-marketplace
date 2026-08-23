@@ -9,6 +9,7 @@ const modules = [
   { name: "User & Seller Accounts", value: "Unified account directory", note: "Authentication users, sellers, stores and admin roles", href: "/admin/accounts" },
   { name: "Seller Onboarding", value: "Assisted account creation", note: "Create active seller accounts and stores", href: "/onboarding/sellers" },
   { name: "Orders & Delivery", value: "Payment-to-delivery control", note: "See payments, purchased products, addresses and fulfilment", href: "/admin/orders" },
+  { name: "Wholesale Negotiations", value: "Open negotiation queue", note: "Accept, reject or counter PAC-SM and demo-product price requests", href: "/admin/wholesale-negotiations" },
   { name: "Vendors", value: "Review centre active", note: "Verification and activation queue", href: "/admin/vendors" },
   { name: "Catalogue", value: "Moderation active", note: "Product moderation and categories", href: "/admin/catalogue" },
   { name: "Returns", value: "Review centre active", note: "Buyer protection and refund decisions", href: "/admin/returns" },
@@ -17,7 +18,6 @@ const modules = [
   ,{ name: "Analytics", value: "Live dashboards", note: "Marketplace operating metrics", href: "/admin/analytics" }
   ,{ name: "Coupons", value: "Promotion controls", note: "Discount campaigns and usage", href: "/admin/coupons" }
   ,{ name: "Business Buyers", value: "Wholesale approvals", note: "Institutional and bulk buyer compliance", href: "/admin/business-buyers" }
-  ,{ name: "Wholesale Negotiations", value: "Commercial oversight", note: "Monitor buyer and seller price negotiations", href: "/admin/wholesale-negotiations" }
   ,{ name: "RFQ Procurement", value: "Trade sourcing active", note: "Supplier matching and quotations", href: "/admin/rfqs" }
   ,{ name: "Warehousing", value: "Fulfilment centre active", note: "Inbound, put-away, picking and packing", href: "/admin/warehousing" }
   ,{ name: "Logistics", value: "Carrier marketplace active", note: "Carrier verification, rates, dispatch and tracking", href: "/admin/logistics" }
@@ -33,12 +33,13 @@ export default async function AdminPage() {
   return <main className="admin-shell">
     <aside className="admin-sidebar">
       <Link className="brand" href="/"><span>PAC</span><b>SM</b></Link>
-      <div><p>ADMIN CENTRE</p><nav aria-label="Admin navigation"><a className="active" href="#overview">Overview</a><a href="#operations">Operations</a><a href="#platform">Platform</a></nav></div>
+      <div><p>ADMIN CENTRE</p><nav aria-label="Admin navigation"><a className="active" href="#overview">Overview</a><Link className="admin-priority-link" href="/admin/wholesale-negotiations">Wholesale Negotiations</Link><a href="#operations">All operations</a><a href="#platform">Platform</a></nav></div>
       <form action="/api/auth/logout" method="post"><button>Sign out</button></form>
     </aside>
     <section className="admin-main" id="overview">
       <header><div><p className="kicker">SUPER ADMINISTRATION</p><h1>Continental command centre.</h1></div><div className="admin-identity"><span>Signed in as</span><strong>{user.email}</strong></div></header>
       <div className="admin-notice"><strong>Appwrite operations active</strong><p>Authentication, marketplace data, private files, review history and audit records are connected to the self-hosted backend.</p></div>
+      <Link className="admin-negotiation-callout" href="/admin/wholesale-negotiations"><span>WHOLESALE PRICE REQUESTS</span><strong>Review buyer negotiations</strong><p>Accept, reject or send a counteroffer for PAC-SM-owned and demo products.</p><b>Open queue →</b></Link>
       <section className="admin-grid" id="operations">{modules.map((module) => <article key={module.name}><span>{module.name}</span><strong>{module.href ? <Link href={module.href}>{module.value}</Link> : module.value}</strong><p>{module.note}</p></article>)}</section>
       <section className="admin-platform" id="platform"><div><p className="kicker">PLATFORM STATUS</p><h2>Core services</h2></div><div className="service-list"><p><span className="status-dot online" />Appwrite authentication</p><p><span className="status-dot online" />Appwrite secure storage</p><p><span className="status-dot online" />Appwrite database</p><p><span className="status-dot waiting" />Marketplace worker</p></div></section>
     </section>
