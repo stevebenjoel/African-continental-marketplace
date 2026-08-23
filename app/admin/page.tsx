@@ -14,6 +14,7 @@ const modules = [
   { name: "Catalogue", value: "Moderation active", note: "Product moderation and categories", href: "/admin/catalogue" },
   { name: "Returns", value: "Review centre active", note: "Buyer protection and refund decisions", href: "/admin/returns" },
   { name: "Finance", value: "Ledger active", note: "Commission, journals and refunds", href: "/admin/finance" }
+  ,{ name: "Seller Withdrawals", value: "Review claims", note: "Approve or reject wallet claims through the central account", href: "/admin/withdrawals" }
   ,{ name: "Disputes", value: "Resolution centre active", note: "Customer protection cases", href: "/admin/disputes" }
   ,{ name: "Analytics", value: "Live dashboards", note: "Marketplace operating metrics", href: "/admin/analytics" }
   ,{ name: "Coupons", value: "Promotion controls", note: "Discount campaigns and usage", href: "/admin/coupons" }

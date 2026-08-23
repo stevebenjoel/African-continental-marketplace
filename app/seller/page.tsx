@@ -4,15 +4,16 @@ import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { findVendorByOwner, getVendorBundle } from "@/src/modules/vendors/server/repository";
 
 export const dynamic = "force-dynamic";
-const plannedModules = ["My Store", "Returns", "Logistics", "Team"];
+const plannedModules = ["Returns", "Logistics", "Team"];
 const activeModules = [
+  { name: "My Store", href: "/seller/storefront", label: "Logo and colour theme" },
   { name: "Compliance", href: "/seller/compliance", label: "Standards and certifications" },
   { name: "Integrations", href: "/seller/integrations", label: "Manage API and webhooks" },
   { name: "Trade Passport", href: "/seller/trade", label: "Manage export readiness" },
   { name: "Products", href: "/seller/products", label: "Manage catalogue" },
   { name: "Inventory", href: "/seller/inventory", label: "Manage stock" },
   { name: "Orders", href: "/seller/orders", label: "View orders" },
-  { name: "Finance", href: "/seller/finance", label: "View balance" },
+  { name: "Wallet", href: "/seller/wallet", label: "Income and withdrawals" },
   { name: "Disputes", href: "/seller/disputes", label: "View cases" },
   { name: "Analytics", href: "/seller/analytics", label: "View performance" },
   { name: "RFQs", href: "/seller/rfqs", label: "Supplier opportunities" }

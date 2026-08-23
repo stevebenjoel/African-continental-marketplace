@@ -1,0 +1,5 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { isSuperAdmin } from "@/src/modules/authorization/domain/super-admin";
+import { assertSameOrigin, publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { reviewWithdrawal } from "@/src/modules/finance/server/withdrawals";
+export async function POST(request: Request) { try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); } const user = await getCurrentAppwriteUser(); if (!user || !isSuperAdmin(user.labels)) return new Response("Forbidden", { status: 403 }); try { const form = await request.formData(), action = String(form.get("action")); if (action !== "pay" && action !== "reject") throw new Error("Invalid action"); await reviewWithdrawal({ requestId: String(form.get("requestId") ?? ""), action, actorUserId: user.$id, note: String(form.get("note") ?? "") }); return Response.redirect(publicAppUrl("/admin/withdrawals?reviewed=1"), 303); } catch (error) { console.error("Withdrawal review failed", error); return Response.redirect(publicAppUrl("/admin/withdrawals?error=1"), 303); } }

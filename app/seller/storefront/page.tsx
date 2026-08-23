@@ -1,0 +1,13 @@
+import Link from "next/link";
+import Image from "next/image";
+import { redirect } from "next/navigation";
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { getOwnedStore } from "@/src/modules/storefront/server/repository";
+
+export const dynamic = "force-dynamic";
+export default async function SellerStorefrontPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
+  const user = await getCurrentAppwriteUser(); if (!user) redirect("/login?returnTo=/seller/storefront");
+  const [store, query] = await Promise.all([getOwnedStore(user.$id), searchParams]); if (!store) redirect("/vendor/register");
+  const primary = String(store.themePrimary ?? "#075E54"), accent = String(store.themeAccent ?? "#F4B400");
+  return <main className="seller-shell"><nav><Link className="brand" href="/"><span>PAC</span><b>SM</b></Link><Link href="/seller">Seller Centre</Link></nav><header><div><p className="kicker">MY STOREFRONT</p><h1>Brand your store</h1><p>Every PAC-SM seller uses the same professional storefront layout. Your logo and colour theme make it recognisably yours.</p>{query.saved && <p className="success-note">Storefront branding saved.</p>}{query.error && <p className="form-error">Branding could not be saved. Check the logo format and colour choices.</p>}</div><Link href={`/store/${store.slug}`}>View public store →</Link></header><section className="store-branding-layout"><form className="store-branding-form" action="/api/seller/storefront" method="post" encType="multipart/form-data"><label>Primary colour<input type="color" name="primary" defaultValue={primary}/></label><label>Accent colour<input type="color" name="accent" defaultValue={accent}/></label><label>Store logo<input type="file" name="logo" accept="image/jpeg,image/png,image/webp"/><small>Optional JPEG, PNG or WebP, maximum 4 MB. It is fitted without stretching.</small></label><label>Logo description<input name="altText" required minLength={3} maxLength={180} defaultValue={String(store.logoAltText ?? `${store.name} logo`)}/></label><button type="submit">Save storefront branding</button></form><aside className="store-brand-preview" style={{ "--store-primary": primary, "--store-accent": accent } as React.CSSProperties}><span>STOREFRONT PREVIEW</span><div>{store.logoFileId ? <Image unoptimized width={90} height={90} src={`/api/storefront/logo/${store.$id}`} alt={String(store.logoAltText ?? "Store logo")}/> : <b>{String(store.name).slice(0, 2).toUpperCase()}</b>}<h2>{String(store.name)}</h2></div><button type="button">Shop collection</button></aside></section></main>;
+}
