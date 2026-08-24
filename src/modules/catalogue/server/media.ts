@@ -33,8 +33,14 @@ export async function listApprovedMediaForProducts(productIds: string[]) {
   return grouped;
 }
 
-export async function createProductMedia(input: { productId: string; vendorId: string; fileId: string; filename: string; mimeType: string; sizeBytes: number; altText: string; sortOrder: number }) {
-  return db().createDocument({ databaseId: databaseId(), collectionId: "product_media", documentId: ID.unique(), permissions: [], data: { ...input, bucketId: env().APPWRITE_PRODUCT_MEDIA_BUCKET_ID, isPrimary: "false", status: "submitted", uploadedAt: new Date().toISOString() } });
+export async function createProductMedia(input: { productId: string; vendorId: string; actorUserId: string; fileId: string; filename: string; mimeType: string; sizeBytes: number; altText: string; sortOrder: number; makePrimary: boolean }) {
+  const databases = db(), transaction = await databases.createTransaction({ ttl: 120 }), now = new Date().toISOString(), mediaId = ID.unique(), id = databaseId();
+  try {
+    const media = await databases.createDocument({ databaseId: id, collectionId: "product_media", documentId: mediaId, permissions: [], transactionId: transaction.$id, data: { productId: input.productId, vendorId: input.vendorId, fileId: input.fileId, filename: input.filename, mimeType: input.mimeType, sizeBytes: input.sizeBytes, altText: input.altText, sortOrder: input.sortOrder, bucketId: env().APPWRITE_PRODUCT_MEDIA_BUCKET_ID, isPrimary: input.makePrimary ? "true" : "false", status: "approved", uploadedAt: now, reviewedAt: now, reviewedBy: input.actorUserId, reviewNotes: "Auto-published for approved seller" } });
+    await databases.createDocument({ databaseId: id, collectionId: "audit_logs", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { actorUserId: input.actorUserId, action: "product_media.auto_publish", entityType: "product_media", entityId: mediaId, metadata: JSON.stringify({ productId: input.productId, vendorId: input.vendorId }), occurredAt: now } });
+    await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    return media;
+  } catch (error) { await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined); throw error; }
 }
 
 export async function reviewProductMedia(mediaId: string, action: "approve" | "reject" | "set_primary", actorUserId: string, notes: string) {

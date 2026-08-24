@@ -30,10 +30,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
       if (!validProductImageSignature(bytes, file.type)) throw new Error("Image content does not match its type");
       const fileId = ID.unique();
       await storage.createFile({ bucketId: env().APPWRITE_PRODUCT_MEDIA_BUCKET_ID, fileId, file: InputFile.fromBuffer(Buffer.from(bytes), file.name), permissions: [] });
-      try { await createProductMedia({ productId, vendorId: vendor.$id, fileId, filename: file.name, mimeType: file.type, sizeBytes: file.size, altText: files.length > 1 ? `${altText} — image ${existing.total + index + 1}` : altText, sortOrder: existing.total + index }); }
+      try { await createProductMedia({ productId, vendorId: vendor.$id, actorUserId: user.$id, fileId, filename: file.name, mimeType: file.type, sizeBytes: file.size, altText: files.length > 1 ? `${altText} — image ${existing.total + index + 1}` : altText, sortOrder: existing.total + index, makePrimary: existing.total === 0 && index === 0 }); }
       catch (error) { await storage.deleteFile({ bucketId: env().APPWRITE_PRODUCT_MEDIA_BUCKET_ID, fileId }).catch(() => undefined); throw error; }
     }
-    return Response.redirect(publicAppUrl("/seller/products?media=uploaded"), 303);
+    return Response.redirect(publicAppUrl("/seller/products?media=published"), 303);
   } catch (error) {
     console.error("Product media upload failed", error);
     return Response.redirect(publicAppUrl("/seller/products?media=error"), 303);
