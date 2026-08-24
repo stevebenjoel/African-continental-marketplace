@@ -14,7 +14,9 @@ const schema = z.object({
   APPWRITE_KYC_BUCKET_ID: z.string().min(1),
   SESSION_COOKIE_NAME: z.string().default("pacsm_session"),
   SESSION_COOKIE_DOMAIN: z.string().optional(),
-  PAYSTACK_SECRET_KEY: z.string().min(1).optional()
+  PAYSTACK_SECRET_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_PRODUCT_DRAFT_MODEL: z.string().min(1).default("gpt-5.4-mini")
 });
 
 export type Environment = z.infer<typeof schema>;

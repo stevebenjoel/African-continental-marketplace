@@ -1,0 +1,4 @@
+import { z } from "zod";
+export const productDraftRequestSchema = z.object({ name: z.string().trim().min(3).max(240), category: z.string().trim().max(120).optional().default(""), knownFacts: z.string().trim().max(1500).optional().default("") });
+export const productDraftSchema = z.object({ suggestedSlug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(240), description: z.string().trim().min(40).max(3000), specifications: z.array(z.string().trim().min(2).max(180)).min(3).max(10), variantName: z.string().trim().min(2).max(180), variantAttributes: z.string().trim().min(2).max(1000), searchKeywords: z.array(z.string().trim().min(2).max(60)).min(3).max(12), questionsForSeller: z.array(z.string().trim().min(2).max(180)).max(8) });
+export type ProductDraft = z.infer<typeof productDraftSchema>;
