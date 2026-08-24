@@ -20,6 +20,7 @@ import "./help.css";
 import "./brand-scale.css";
 import GlobalRegionBar from "@/app/components/global-region-bar";
 import GlobalHomeLink from "@/app/components/global-home-link";
+import GlobalProductUploadLink from "@/app/components/global-product-upload-link";
 import { getInterfaceLanguage } from "@/src/modules/localization/server/language";
 
 export const metadata: Metadata = {
@@ -36,5 +37,5 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const language = await getInterfaceLanguage();
-  return <html lang={language} dir={language === "ar" ? "rtl" : "ltr"}><body suppressHydrationWarning><GlobalRegionBar />{children}<GlobalHomeLink /></body></html>;
+  return <html lang={language} dir={language === "ar" ? "rtl" : "ltr"}><body suppressHydrationWarning><GlobalRegionBar />{children}<GlobalProductUploadLink /><GlobalHomeLink /></body></html>;
 }
