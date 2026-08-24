@@ -17,6 +17,7 @@ import "./home-lanes.css";
 import "./commerce-home.css";
 import "./region.css";
 import "./help.css";
+import "./brand-scale.css";
 import GlobalRegionBar from "@/app/components/global-region-bar";
 import GlobalHomeLink from "@/app/components/global-home-link";
 import { getInterfaceLanguage } from "@/src/modules/localization/server/language";

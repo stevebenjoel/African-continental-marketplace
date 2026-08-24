@@ -1,0 +1,28 @@
+.brand {
+  width: 157px;
+  height: 90px;
+  flex: 0 0 157px;
+}
+
+.nav,
+.account-nav,
+.help-nav,
+.storefront-nav {
+  min-height: 110px;
+  height: auto;
+}
+
+@media (max-width: 760px) {
+  .brand {
+    width: 132px;
+    height: 76px;
+    flex-basis: 132px;
+  }
+
+  .nav,
+  .account-nav,
+  .help-nav,
+  .storefront-nav {
+    min-height: 96px;
+  }
+}
