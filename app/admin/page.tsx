@@ -4,6 +4,7 @@ import { requireSuperAdmin } from "@/src/modules/authorization/server/require-su
 export const dynamic = "force-dynamic";
 
 const modules = [
+  { name: "Product Management", value: "Manage marketplace products", note: "Review live seller listings, approve legacy products, take down, restore or delete", href: "/admin/catalogue" },
   { name: "Off-takers", value: "Corporate buyer ecosystem", note: "KYB, requirements, agreements and inspections", href: "/admin/offtakers" },
   { name: "Off-taker Finance", value: "Milestones & disputes", note: "Settlement status and dispute resolution", href: "/admin/offtakers/finance" },
   { name: "User & Seller Accounts", value: "Unified account directory", note: "Authentication users, sellers, stores and admin roles", href: "/admin/accounts" },
@@ -11,7 +12,6 @@ const modules = [
   { name: "Orders & Delivery", value: "Payment-to-delivery control", note: "See payments, purchased products, addresses and fulfilment", href: "/admin/orders" },
   { name: "Wholesale Negotiations", value: "Open negotiation queue", note: "Accept, reject or counter PAC-SM and demo-product price requests", href: "/admin/wholesale-negotiations" },
   { name: "Vendors", value: "Review centre active", note: "Verification and activation queue", href: "/admin/vendors" },
-  { name: "Catalogue", value: "Moderation active", note: "Product moderation and categories", href: "/admin/catalogue" },
   { name: "Returns", value: "Review centre active", note: "Buyer protection and refund decisions", href: "/admin/returns" },
   { name: "Finance", value: "Ledger active", note: "Commission, journals and refunds", href: "/admin/finance" }
   ,{ name: "Seller Withdrawals", value: "Review claims", note: "Approve or reject wallet claims through the central account", href: "/admin/withdrawals" }
@@ -41,7 +41,7 @@ export default async function AdminPage() {
       <header><div><p className="kicker">SUPER ADMINISTRATION</p><h1>Continental command centre.</h1></div><div className="admin-identity"><span>Signed in as</span><strong>{user.email}</strong></div></header>
       <div className="admin-notice"><strong>Appwrite operations active</strong><p>Authentication, marketplace data, private files, review history and audit records are connected to the self-hosted backend.</p></div>
       <Link className="admin-negotiation-callout" href="/admin/wholesale-negotiations"><span>WHOLESALE PRICE REQUESTS</span><strong>Review buyer negotiations</strong><p>Accept, reject or send a counteroffer for PAC-SM-owned and demo products.</p><b>Open queue →</b></Link>
-      <section className="admin-grid" id="operations">{modules.map((module) => <article key={module.name}><span>{module.name}</span><strong>{module.href ? <Link href={module.href}>{module.value}</Link> : module.value}</strong><p>{module.note}</p></article>)}</section>
+      <section className="admin-grid" id="operations">{modules.map((module) => <article className={module.href === "/admin/catalogue" ? "admin-operation-priority" : undefined} key={module.name}><span>{module.name}</span><strong>{module.href ? <Link href={module.href}>{module.value}</Link> : module.value}</strong><p>{module.note}</p></article>)}</section>
       <section className="admin-platform" id="platform"><div><p className="kicker">PLATFORM STATUS</p><h2>Core services</h2></div><div className="service-list"><p><span className="status-dot online" />Appwrite authentication</p><p><span className="status-dot online" />Appwrite secure storage</p><p><span className="status-dot online" />Appwrite database</p><p><span className="status-dot waiting" />Marketplace worker</p></div></section>
     </section>
   </main>;
