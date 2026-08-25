@@ -23,6 +23,8 @@ const modules = [
   ,{ name: "Warehousing", value: "Fulfilment centre active", note: "Inbound, put-away, picking and packing", href: "/admin/warehousing" }
   ,{ name: "Logistics", value: "Carrier marketplace active", note: "Carrier verification, rates, dispatch and tracking", href: "/admin/logistics" }
   ,{ name: "Continental Trade", value: "Trade compliance active", note: "Passports, export readiness and customs records", href: "/admin/trade" }
+  ,{ name: "Regulatory Control", value: "Versioned market-access rules", note: "Official sources, HS oversight and destination readiness", href: "/admin/trade-compliance" }
+  ,{ name: "HS Classification Review", value: "Govern AI and vendor suggestions", note: "Review confidence, reasoning and clarification questions", href: "/admin/trade-compliance/classifications" }
   ,{ name: "Standards", value: "Compliance registry active", note: "Product, packaging, certification and quality centres", href: "/admin/standards" }
   ,{ name: "Enterprise APIs", value: "Merchant API v1 active", note: "Scoped credentials, webhooks and connectors", href: "/developers" }
   ,{ name: "Intelligence", value: "Forecasting and risk active", note: "Demand models, recommendations, jobs and fraud signals", href: "/admin/intelligence" }

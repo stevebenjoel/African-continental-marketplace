@@ -1,0 +1,3 @@
+import test from"node:test";import assert from"node:assert/strict";import{confidenceBand,hsSuggestionSchema,requiresHumanReview}from"../../src/modules/export-readiness/domain/hs-classification.ts";
+test("HS suggestion preserves six digit hierarchy",()=>{const x=hsSuggestionSchema.parse({hs6:"640399",chapter:"64",heading:"6403",confidencePercent:91,reasoning:"The supplied facts identify footwear and describe the upper and outer sole materials sufficiently.",alternatives:[],questions:[],attributesUsed:["upper material","sole material"]});assert.equal(x.hs6,"640399")});
+test("confidence bands and sensitive classes require governance",()=>{assert.equal(confidenceBand(74),"LOW");assert.equal(requiresHumanReview("medical devices",99),true)});
