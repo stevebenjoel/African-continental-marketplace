@@ -3,6 +3,7 @@ import { loginSchema } from "@/src/modules/auth/domain/credentials";
 import { assertSameOrigin, publicAppUrl, safeReturnTo } from "@/src/modules/auth/server/request-security";
 import { sessionCookieOptions } from "@/src/modules/auth/server/session";
 import { env } from "@/src/shared/config/env";
+import { extractAppwriteSessionSecret } from "@/src/modules/auth/domain/appwrite-session-cookie";
 
 export async function POST(request: Request) {
   try { assertSameOrigin(request); } catch { return Response.json({ error: "forbidden" }, { status: 403 }); }
@@ -18,11 +19,10 @@ export async function POST(request: Request) {
     });
     const session = await appwriteResponse.json() as { expire?: string; message?: string };
     if (!appwriteResponse.ok) throw new Error(session.message ?? "Appwrite rejected the login");
-    const sessionCookie = appwriteResponse.headers.getSetCookie().find((value) => value.startsWith(`a_session_${config.APPWRITE_PROJECT_ID}=`));
-    const sessionSecret = sessionCookie?.slice(sessionCookie.indexOf("=") + 1, sessionCookie.indexOf(";"));
+    const sessionSecret = extractAppwriteSessionSecret(appwriteResponse.headers.getSetCookie(), config.APPWRITE_PROJECT_ID);
     if (!sessionSecret) throw new Error("Appwrite did not return a server session cookie");
     const response = NextResponse.redirect(publicAppUrl(safeReturnTo(form.get("returnTo"))), 303);
-    response.cookies.set(config.SESSION_COOKIE_NAME, decodeURIComponent(sessionSecret), sessionCookieOptions(session.expire));
+    response.cookies.set(config.SESSION_COOKIE_NAME, sessionSecret, sessionCookieOptions(session.expire));
     return response;
   } catch (error) {
     const diagnostic = error && typeof error === "object" ? {

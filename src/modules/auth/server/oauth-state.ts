@@ -1,28 +1,23 @@
 import "server-only";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { env } from "@/src/shared/config/env";
+import { readSecret } from "@/src/shared/security/server-secret";
+import { createSignedOAuthState, verifySignedOAuthState } from "@/src/modules/auth/domain/oauth-state";
 
-export const OAUTH_STATE_COOKIE = "pacsm_oauth_state";
-export const OAUTH_RETURN_COOKIE = "pacsm_oauth_return_to";
-
-export function createOAuthState(): string {
-  return randomBytes(32).toString("base64url");
+function secret() {
+  const config = env();
+  if (config.NODE_ENV !== "production") {
+    const state = globalThis as typeof globalThis & { __pacsmOAuthStateSecret?: string };
+    state.__pacsmOAuthStateSecret ??= randomBytes(32).toString("base64url");
+    return state.__pacsmOAuthStateSecret;
+  }
+  return readSecret(config.APPWRITE_API_KEY, config.APPWRITE_API_KEY_FILE, "OAuth state signing key");
 }
 
-export function validOAuthState(expected?: string, received?: string): boolean {
-  if (!expected || !received) return false;
-  const left = Buffer.from(expected);
-  const right = Buffer.from(received);
-  return left.length === right.length && timingSafeEqual(left, right);
+export function createOAuthState(returnTo: string): string {
+  return createSignedOAuthState({ secret: secret(), returnTo });
 }
 
-export function oauthCookieOptions() {
-  return {
-    httpOnly: true,
-    secure: env().NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge: 10 * 60,
-    priority: "high" as const
-  };
+export function readOAuthState(token?: string) {
+  return verifySignedOAuthState({ token, secret: secret() });
 }
