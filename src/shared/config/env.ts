@@ -13,7 +13,6 @@ const schema = z.object({
   APPWRITE_PRODUCT_MEDIA_BUCKET_ID: z.string().min(1),
   APPWRITE_KYC_BUCKET_ID: z.string().min(1),
   SESSION_COOKIE_NAME: z.string().default("pacsm_session"),
-  SESSION_COOKIE_DOMAIN: z.string().optional(),
   PAYSTACK_SECRET_KEY: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().min(1).default("PAC-SM <notifications@mail.africancontinentalmarketplace.store>"),

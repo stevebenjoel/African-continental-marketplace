@@ -15,9 +15,9 @@ export async function createAppwriteTokenSession(input: { userId: string; tokenS
     cache: "no-store",
     signal: AbortSignal.timeout(10_000)
   });
-  const session = await response.json().catch(() => ({})) as { expire?: string; message?: string };
+  const session = await response.json().catch(() => ({})) as { expire?: string; message?: string; secret?: string };
   if (!response.ok) throw new Error(session.message ?? `Appwrite token exchange failed (${response.status})`);
-  const secret = extractAppwriteSessionSecret(response.headers.getSetCookie(), config.APPWRITE_PROJECT_ID);
+  const secret = session.secret || extractAppwriteSessionSecret(response.headers.getSetCookie(), config.APPWRITE_PROJECT_ID);
   if (!secret) throw new Error("Appwrite did not return a server session cookie");
   return { secret, expire: session.expire };
 }

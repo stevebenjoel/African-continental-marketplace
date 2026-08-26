@@ -13,13 +13,17 @@ export async function POST(request: Request) {
     const config = env();
     const appwriteResponse = await fetch(`${config.APPWRITE_ENDPOINT}/account/sessions/email`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Appwrite-Project": config.APPWRITE_PROJECT_ID },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Appwrite-Project": config.APPWRITE_PROJECT_ID,
+        "X-Appwrite-Response-Format": "1.8.1"
+      },
       body: JSON.stringify(input),
       cache: "no-store"
     });
-    const session = await appwriteResponse.json() as { expire?: string; message?: string };
+    const session = await appwriteResponse.json() as { expire?: string; message?: string; secret?: string };
     if (!appwriteResponse.ok) throw new Error(session.message ?? "Appwrite rejected the login");
-    const sessionSecret = extractAppwriteSessionSecret(appwriteResponse.headers.getSetCookie(), config.APPWRITE_PROJECT_ID);
+    const sessionSecret = session.secret || extractAppwriteSessionSecret(appwriteResponse.headers.getSetCookie(), config.APPWRITE_PROJECT_ID);
     if (!sessionSecret) throw new Error("Appwrite did not return a server session cookie");
     const response = NextResponse.redirect(publicAppUrl(safeReturnTo(form.get("returnTo"))), 303);
     response.cookies.set(config.SESSION_COOKIE_NAME, sessionSecret, sessionCookieOptions(session.expire));

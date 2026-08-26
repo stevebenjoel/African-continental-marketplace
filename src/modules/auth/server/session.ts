@@ -15,7 +15,6 @@ export function sessionCookieOptions(expiresAt?: string) {
   return {
     httpOnly: true, secure: config.NODE_ENV === "production", sameSite: "lax" as const,
     path: "/", priority: "high" as const,
-    ...(config.SESSION_COOKIE_DOMAIN ? { domain: config.SESSION_COOKIE_DOMAIN } : {}),
     ...(expiresAt ? { expires: new Date(expiresAt) } : {})
   };
 }
