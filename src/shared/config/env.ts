@@ -18,7 +18,8 @@ const schema = z.object({
   RESEND_FROM_EMAIL: z.string().min(1).default("PAC-SM <notifications@mail.africancontinentalmarketplace.store>"),
   RESEND_REPLY_TO_EMAIL: z.preprocess(value => value === "" ? undefined : value, z.email().optional()),
   OPENAI_API_KEY: z.string().min(1).optional(),
-  OPENAI_PRODUCT_DRAFT_MODEL: z.string().min(1).default("gpt-5.4-mini")
+  OPENAI_PRODUCT_DRAFT_MODEL: z.string().min(1).default("gpt-5.4-mini"),
+  RECONCILIATION_CRON_SECRET: z.string().min(24).optional()
 });
 
 export type Environment = z.infer<typeof schema>;

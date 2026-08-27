@@ -6,6 +6,7 @@ import { getCart } from "@/src/modules/cart/server/repository";
 import { listAddresses } from "@/src/modules/customers/server/repository";
 import { validateCoupon } from "@/src/modules/promotions/server/coupons";
 import { isAcceptedNegotiationUsable } from "@/src/modules/wholesale/domain/negotiation";
+import { publishAdminNotificationSafely } from "@/src/modules/admin-notifications/server/publisher";
 
 const publicId = (prefix: string) => `PAC-${prefix}-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`;
 
@@ -72,6 +73,7 @@ export async function checkout(userId: string, addressId: string, couponCode = "
     await db.createDocument({ databaseId, collectionId: "notifications", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { userId, type: "order", title: "Order created", body: "Your stock is reserved and awaiting payment.", href: `/orders/${orderId}`, createdAt } });
     for (const item of items) await db.deleteDocument({ databaseId, collectionId: "cart_items", documentId: item.$id, transactionId: transaction.$id });
     await db.updateTransaction({ transactionId: transaction.$id, commit: true });
+    await publishAdminNotificationSafely({eventType:"order_created",priority:"information",title:"New marketplace order",body:`Order ${orderId} was created and is awaiting payment.`,entityType:"order",entityId:orderId,href:`/admin/orders?orderId=${orderId}`,roles:["order_fulfilment_manager"]});
     return orderId;
   } catch (error) {
     await db.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined);

@@ -1,0 +1,4 @@
+import { assertSameOrigin,publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { requireReconciliationAccess } from "@/src/modules/reconciliation/server/access";
+import { runReconciliation } from "@/src/modules/reconciliation/server/engine";
+export async function POST(request:Request){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await requireReconciliationAccess(),form=await request.formData(),date=String(form.get("date")??"");try{await runReconciliation(user.$id,date||undefined);return Response.redirect(publicAppUrl(`/admin/reconciliation?date=${encodeURIComponent(date)}&ran=1`),303)}catch(error){console.error("Reconciliation run failed",error);return Response.redirect(publicAppUrl(`/admin/reconciliation?date=${encodeURIComponent(date)}&error=1`),303)}}

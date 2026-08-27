@@ -3,6 +3,7 @@ import { ID, Query } from "node-appwrite";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
 import { postPaymentJournal } from "@/src/modules/finance/server/journals";
+import { publishAdminNotificationSafely } from "@/src/modules/admin-notifications/server/publisher";
 
 const nextPaymentNumber = () => `PAC-PAY-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`;
 
@@ -35,6 +36,7 @@ export async function captureVerifiedPayment(userId: string, orderId: string, pr
     await databases.updateDocument({ databaseId, collectionId: "orders", documentId: orderId, data: { status: "paid" }, transactionId: transaction.$id });
     await databases.createDocument({ databaseId, collectionId: "order_events", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { orderId, eventType: "payment_confirmed", actorUserId: userId, metadata: JSON.stringify({ paymentId: payment.$id, provider, providerReference }), occurredAt: capturedAt } });
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    await publishAdminNotificationSafely({eventType:"payment_captured",priority:"action",title:"Payment captured — fulfilment required",body:`${order.currency} ${(Number(order.totalMinor)/100).toLocaleString()} was captured for order ${orderId}.`,entityType:"order",entityId:orderId,href:`/admin/orders?orderId=${orderId}`,roles:["finance_officer","order_fulfilment_manager"]});
     return { orderId, paymentId: payment.$id };
   } catch (error) {
     await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined);
