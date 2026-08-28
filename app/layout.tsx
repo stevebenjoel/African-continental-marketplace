@@ -22,6 +22,7 @@ import "./academy.css";
 import "./academy-reader.css";
 import "./academy-assessment.css";
 import "./academy-project.css";
+import "./admin-team.css";
 import GlobalRegionBar from "@/app/components/global-region-bar";
 import GlobalHomeLink from "@/app/components/global-home-link";
 import GlobalProductUploadLink from "@/app/components/global-product-upload-link";

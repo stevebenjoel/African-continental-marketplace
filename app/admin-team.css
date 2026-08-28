@@ -1,0 +1,12 @@
+.admin-role-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+.admin-user-picker{display:grid;grid-template-columns:1fr 1.35fr;gap:16px;padding:18px;margin-bottom:18px;border:1px solid #18382c26;background:#f8f8f2}
+.admin-user-picker label{display:grid;align-content:start;gap:7px;font-weight:800}
+.admin-user-picker input,.admin-user-picker select{width:100%;padding:12px;border:1px solid #18382c38;background:#fff;color:var(--ink);font:inherit}
+.admin-user-picker select{min-height:150px;padding:5px}
+.admin-user-picker option{padding:8px}
+.admin-user-picker>p{margin:0;color:var(--muted);font-size:13px}
+.admin-user-picker>aside{display:grid;gap:4px;padding:12px;background:#e8f3eb;border-left:4px solid var(--green)}
+.admin-user-picker>aside span{color:var(--muted);font-size:13px}
+.admin-role-create button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:850px){.admin-role-summary{grid-template-columns:1fr 1fr}.admin-user-picker{grid-template-columns:1fr}}
+@media(max-width:560px){.admin-role-summary{grid-template-columns:1fr}}
