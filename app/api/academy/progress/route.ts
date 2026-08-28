@@ -1,0 +1,4 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin,publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { completeAcademyLesson } from "@/src/modules/academy/server/repository";
+export async function POST(request:Request){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await getCurrentAppwriteUser();if(!user)return new Response("Unauthorized",{status:401});const form=await request.formData(),moduleId=String(form.get("moduleId")??""),lessonId=String(form.get("lessonId")??"");try{await completeAcademyLesson(user.$id,moduleId,lessonId);return Response.redirect(publicAppUrl(`/academy/modules/${encodeURIComponent(moduleId)}?completed=${encodeURIComponent(lessonId)}`),303)}catch{return Response.redirect(publicAppUrl(`/academy/modules/${encodeURIComponent(moduleId)}?error=progress`),303)}}

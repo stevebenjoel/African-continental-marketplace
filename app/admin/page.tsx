@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 const modules = [
   { name: "Product Management", value: "Manage marketplace products", note: "Review live seller listings, approve legacy products, take down, restore or delete", href: "/admin/catalogue" },
   { name: "Daily Reconciliation", value: "Operations and account control", note: "Orders, payments, fulfilment, transit, complaints and exceptions", href: "/admin/reconciliation" },
+  { name: "Trade Academy", value: "Learning operations", note: "Curriculum, enrolments, progress, assessments, projects and credentials", href: "/admin/academy" },
   { name: "Off-takers", value: "Corporate buyer ecosystem", note: "KYB, requirements, agreements and inspections", href: "/admin/offtakers" },
   { name: "Off-taker Finance", value: "Milestones & disputes", note: "Settlement status and dispute resolution", href: "/admin/offtakers/finance" },
   { name: "User & Seller Accounts", value: "Unified account directory", note: "Authentication users, sellers, stores and admin roles", href: "/admin/accounts" },

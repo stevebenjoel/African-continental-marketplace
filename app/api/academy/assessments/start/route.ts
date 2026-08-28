@@ -1,0 +1,4 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin,publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { startModuleAssessment } from "@/src/modules/academy/server/assessment-repository";
+export async function POST(request:Request){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await getCurrentAppwriteUser();if(!user)return new Response("Unauthorized",{status:401});const form=await request.formData(),moduleId=String(form.get("moduleId")??"");try{await startModuleAssessment(user.$id,moduleId);return Response.redirect(publicAppUrl(`/academy/assessments/${encodeURIComponent(moduleId)}`),303)}catch{return Response.redirect(publicAppUrl(`/academy/assessments/${encodeURIComponent(moduleId)}?error=start`),303)}}

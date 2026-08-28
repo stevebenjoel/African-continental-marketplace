@@ -1,0 +1,6 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { assertSameOrigin,publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { hasAdminRole } from "@/src/modules/authorization/domain/admin-roles";
+import { isSuperAdmin } from "@/src/modules/authorization/domain/super-admin";
+import { gradeAcademyProject } from "@/src/modules/academy/server/project-repository";
+export async function POST(request:Request,{params}:{params:Promise<{projectId:string}>}){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await getCurrentAppwriteUser();if(!user||(!isSuperAdmin(user.labels)&&!hasAdminRole(user.labels,["academy_admin","academy_assessor"])))return new Response("Forbidden",{status:403});const{projectId}=await params,form=await request.formData(),scores=new Map<string,number>();for(const[key,value]of form.entries())if(key.startsWith("score:"))scores.set(key.slice(6),Number(value));try{await gradeAcademyProject(projectId,user.$id,scores,String(form.get("feedback")??""));return Response.redirect(publicAppUrl(`/admin/academy/projects/${projectId}?graded=1`),303)}catch{return Response.redirect(publicAppUrl(`/admin/academy/projects/${projectId}?error=grade`),303)}}
