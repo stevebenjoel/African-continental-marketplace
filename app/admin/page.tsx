@@ -39,14 +39,14 @@ export default async function AdminPage() {
   return <main className="admin-shell">
     <aside className="admin-sidebar">
       <Link className="brand" href="/"><span>PAC</span><b>SM</b></Link>
-      <div><p>ADMIN CENTRE</p><nav aria-label="Admin navigation"><a className="active" href="#overview">Overview</a><Link className="admin-priority-link" href="/admin/wholesale-negotiations">Wholesale Negotiations</Link><a href="#operations">All operations</a><a href="#platform">Platform</a></nav></div>
+      <div><p>ADMIN CENTRE</p><nav aria-label="Admin navigation"><a className="active" href="#overview">Overview</a><Link className="admin-priority-link" href="/admin/accounts">User & Seller Accounts</Link><Link href="/admin/team">Admin Team & Privileges</Link><Link href="/admin/wholesale-negotiations">Wholesale Negotiations</Link><a href="#operations">All operations</a><a href="#platform">Platform</a></nav></div>
       <form action="/api/auth/logout" method="post"><button>Sign out</button></form>
     </aside>
     <section className="admin-main" id="overview">
       <header><div><p className="kicker">SUPER ADMINISTRATION</p><h1>Continental command centre.</h1></div><div className="admin-identity"><span>Signed in as</span><strong>{user.email}</strong></div></header>
       <div className="admin-notice"><strong>Appwrite operations active</strong><p>Authentication, marketplace data, private files, review history and audit records are connected to the self-hosted backend.</p></div>
-      <Link className="admin-negotiation-callout" href="/admin/wholesale-negotiations"><span>WHOLESALE PRICE REQUESTS</span><strong>Review buyer negotiations</strong><p>Accept, reject or send a counteroffer for PAC-SM-owned and demo products.</p><b>Open queue →</b></Link>
-      <section className="admin-grid" id="operations">{modules.map((module) => <article className={module.href === "/admin/catalogue" ? "admin-operation-priority" : undefined} key={module.name}><span>{module.name}</span><strong>{module.href ? <Link href={module.href}>{module.value}</Link> : module.value}</strong><p>{module.note}</p></article>)}</section>
+      <section className="admin-primary-actions"><Link href="/admin/accounts"><span>IDENTITY & ACCESS</span><strong>User & Seller Accounts</strong><p>Find every registered member, review sellers and administrators, suspend access, revoke sessions or delete eligible customer accounts.</p><b>Manage accounts →</b></Link><Link href="/admin/wholesale-negotiations"><span>WHOLESALE PRICE REQUESTS</span><strong>Review buyer negotiations</strong><p>Accept, reject or send a counteroffer for PAC-SM-owned and demo products.</p><b>Open queue →</b></Link></section>
+      <section className="admin-grid" id="operations">{modules.map((module) => <article className={["/admin/catalogue","/admin/accounts"].includes(module.href??"") ? "admin-operation-priority" : undefined} key={module.name}><span>{module.name}</span><strong>{module.href ? <Link href={module.href}>{module.value}</Link> : module.value}</strong><p>{module.note}</p></article>)}</section>
       <section className="admin-platform" id="platform"><div><p className="kicker">PLATFORM STATUS</p><h2>Core services</h2></div><div className="service-list"><p><span className="status-dot online" />Appwrite authentication</p><p><span className="status-dot online" />Appwrite secure storage</p><p><span className="status-dot online" />Appwrite database</p><p><span className="status-dot waiting" />Marketplace worker</p></div></section>
     </section>
   </main>;

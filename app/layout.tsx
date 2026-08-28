@@ -32,6 +32,8 @@ import { hasAdministrativeAccess } from "@/src/modules/authorization/domain/admi
 import AdminNotificationBell from "@/app/components/admin-notification-bell";
 import SupportHub from "@/app/components/support-hub";
 import "./support.css";
+import "./account-lifecycle.css";
+import "./admin-home-priority.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3000"),
