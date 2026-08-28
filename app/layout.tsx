@@ -30,6 +30,8 @@ import { getInterfaceLanguage } from "@/src/modules/localization/server/language
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { hasAdministrativeAccess } from "@/src/modules/authorization/domain/admin-access";
 import AdminNotificationBell from "@/app/components/admin-notification-bell";
+import SupportHub from "@/app/components/support-hub";
+import "./support.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3000"),
@@ -45,5 +47,5 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const [language,user] = await Promise.all([getInterfaceLanguage(),getCurrentAppwriteUser()]);
-  return <html lang={language} dir={language === "ar" ? "rtl" : "ltr"}><body suppressHydrationWarning><GlobalRegionBar />{children}{user&&hasAdministrativeAccess(user.labels)&&<AdminNotificationBell/>}<GlobalProductUploadLink /><GlobalHomeLink /></body></html>;
+  return <html lang={language} dir={language === "ar" ? "rtl" : "ltr"}><body suppressHydrationWarning><GlobalRegionBar />{children}{user&&hasAdministrativeAccess(user.labels)&&<AdminNotificationBell/>}<SupportHub/><GlobalProductUploadLink /><GlobalHomeLink /></body></html>;
 }

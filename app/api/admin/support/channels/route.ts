@@ -1,0 +1,5 @@
+import {getCurrentAppwriteUser} from "@/src/modules/auth/server/session";
+import {isSuperAdmin} from "@/src/modules/authorization/domain/super-admin";
+import {assertSameOrigin,publicAppUrl} from "@/src/modules/auth/server/request-security";
+import {createSupportChannel} from "@/src/modules/support/server/repository";
+export async function POST(request:Request){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await getCurrentAppwriteUser();if(!user||!isSuperAdmin(user.labels))return new Response("Forbidden",{status:403});const form=await request.formData();try{await createSupportChannel({label:String(form.get("label")??""),number:String(form.get("number")??""),message:String(form.get("message")??""),sortOrder:Number(form.get("sortOrder")??10),actorUserId:user.$id});return Response.redirect(publicAppUrl("/admin/support?saved=1"),303)}catch(error){console.error("Support channel creation failed",error);return Response.redirect(publicAppUrl("/admin/support?error=create"),303)}}

@@ -19,6 +19,7 @@ const schema = z.object({
   RESEND_REPLY_TO_EMAIL: z.preprocess(value => value === "" ? undefined : value, z.email().optional()),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_PRODUCT_DRAFT_MODEL: z.string().min(1).default("gpt-5.4-mini"),
+  OPENAI_SUPPORT_MODEL: z.string().min(1).default("gpt-5.4-mini"),
   RECONCILIATION_CRON_SECRET: z.string().min(24).optional()
 });
 

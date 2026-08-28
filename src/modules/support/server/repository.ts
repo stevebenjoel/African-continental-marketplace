@@ -1,0 +1,15 @@
+import "server-only";
+import { ID, Query } from "node-appwrite";
+import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
+import { env } from "@/src/shared/config/env";
+
+export type SupportChannel={id:string;label:string;whatsappNumber:string;prefilledMessage:string;status:string;sortOrder:number};
+const primary:SupportChannel={id:"primary",label:"PAC-SM Customer Support",whatsappNumber:"2349066794666",prefilledMessage:"Hello PAC-SM, I need assistance with the marketplace.",status:"active",sortOrder:1};
+const normalize=(value:string)=>value.replace(/\D/g,"").replace(/^0/,"234");
+const map=(item:Record<string,unknown>):SupportChannel=>({id:String(item.$id),label:String(item.label),whatsappNumber:String(item.whatsappNumber),prefilledMessage:String(item.prefilledMessage??""),status:String(item.status),sortOrder:Number(item.sortOrder)});
+
+const withPrimary=(channels:SupportChannel[])=>channels.some(channel=>channel.whatsappNumber===primary.whatsappNumber)?channels:[primary,...channels];
+export async function listPublicSupportChannels(){try{const result=await createAppwriteDatabaseClient().databases.listDocuments({databaseId:env().APPWRITE_DATABASE_ID,collectionId:"support_channels",queries:[Query.equal("status","active"),Query.orderAsc("sortOrder"),Query.limit(20)]});return withPrimary(result.documents.map(item=>map(item)));}catch{return [primary];}}
+export async function listAllSupportChannels(){try{const result=await createAppwriteDatabaseClient().databases.listDocuments({databaseId:env().APPWRITE_DATABASE_ID,collectionId:"support_channels",queries:[Query.orderAsc("sortOrder"),Query.limit(100)]});return withPrimary(result.documents.map(item=>map(item)));}catch{return [primary];}}
+export async function createSupportChannel(input:{label:string;number:string;message:string;sortOrder:number;actorUserId:string}){const whatsappNumber=normalize(input.number);if(!/^\d{10,15}$/.test(whatsappNumber))throw new Error("INVALID_NUMBER");return createAppwriteDatabaseClient().databases.createDocument({databaseId:env().APPWRITE_DATABASE_ID,collectionId:"support_channels",documentId:ID.unique(),permissions:[],data:{label:input.label.trim().slice(0,120),whatsappNumber,prefilledMessage:input.message.trim().slice(0,500),status:"active",sortOrder:input.sortOrder,createdBy:input.actorUserId,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}});}
+export async function updateSupportChannel(id:string,input:{status?:string;label?:string;message?:string;sortOrder?:number}){const data:Record<string,unknown>={updatedAt:new Date().toISOString()};if(input.status)data.status=input.status;if(input.label)data.label=input.label.trim().slice(0,120);if(input.message!==undefined)data.prefilledMessage=input.message.trim().slice(0,500);if(input.sortOrder!==undefined)data.sortOrder=input.sortOrder;return createAppwriteDatabaseClient().databases.updateDocument({databaseId:env().APPWRITE_DATABASE_ID,collectionId:"support_channels",documentId:id,data});}

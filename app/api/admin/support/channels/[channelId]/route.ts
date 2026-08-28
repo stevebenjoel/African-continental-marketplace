@@ -1,0 +1,5 @@
+import {getCurrentAppwriteUser} from "@/src/modules/auth/server/session";
+import {isSuperAdmin} from "@/src/modules/authorization/domain/super-admin";
+import {assertSameOrigin,publicAppUrl} from "@/src/modules/auth/server/request-security";
+import {updateSupportChannel} from "@/src/modules/support/server/repository";
+export async function POST(request:Request,{params}:{params:Promise<{channelId:string}>}){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await getCurrentAppwriteUser();if(!user||!isSuperAdmin(user.labels))return new Response("Forbidden",{status:403});const[{channelId},form]=await Promise.all([params,request.formData()]);try{await updateSupportChannel(channelId,{status:String(form.get("status"))==="active"?"active":"inactive"});return Response.redirect(publicAppUrl("/admin/support?saved=1"),303)}catch(error){console.error("Support channel update failed",error);return Response.redirect(publicAppUrl("/admin/support?error=update"),303)}}
