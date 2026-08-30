@@ -20,11 +20,19 @@ export function postPaymentJournal(databases: Databases, databaseId: string, tra
 }
 
 export async function postDeliveryJournal(databases: Databases, databaseId: string, transactionId: string, vendorOrder: Record<string, unknown> & { $id: string }) {
-  const rules = await databases.listDocuments({ databaseId, collectionId: "commission_rules", queries: [Query.equal("status", "active"), Query.orderDesc("effectiveFrom"), Query.limit(1)], transactionId });
-  const rate = Number(rules.documents[0]?.rateBasisPoints ?? 1000);
   const gross = Number(vendorOrder.subtotalMinor);
-  const commission = Math.round(gross * rate / 10_000);
-  const payable = gross - commission;
+  const allocations = await databases.listDocuments({ databaseId, collectionId: "commission_allocations", queries: [Query.equal("vendorOrderId", vendorOrder.$id), Query.limit(500)], transactionId });
+  let commission: number, payable: number;
+  if (allocations.documents.length) {
+    commission = allocations.documents.reduce((sum, item) => sum + Number(item.pacsmMinor), 0);
+    payable = allocations.documents.reduce((sum, item) => sum + Number(item.vendorMinor), 0);
+    if (commission + payable !== gross) throw new Error("Commission allocation does not reconcile with vendor order");
+  } else {
+    // Historical orders created before immutable allocations retain the legacy active-rule calculation.
+    const rules = await databases.listDocuments({ databaseId, collectionId: "commission_rules", queries: [Query.equal("status", "active"), Query.orderDesc("effectiveFrom"), Query.limit(1)], transactionId });
+    commission = Math.round(gross * Number(rules.documents[0]?.rateBasisPoints ?? 1000) / 10_000);
+    payable = gross - commission;
+  }
   const lines: Line[] = [{ accountCode: "marketplace_customer_funds", direction: "debit", amountMinor: gross }, { accountCode: "vendor_payable", direction: "credit", amountMinor: payable, vendorId: String(vendorOrder.vendorId) }];
   if (commission) lines.push({ accountCode: "commission_revenue", direction: "credit", amountMinor: commission });
   return postJournal(databases, databaseId, transactionId, { referenceType: "vendor_order_delivery", referenceId: vendorOrder.$id, description: "Recognise delivered sale and marketplace commission", currency: String(vendorOrder.currency), lines });

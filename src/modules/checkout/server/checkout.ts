@@ -7,6 +7,7 @@ import { listAddresses } from "@/src/modules/customers/server/repository";
 import { validateCoupon } from "@/src/modules/promotions/server/coupons";
 import { isAcceptedNegotiationUsable } from "@/src/modules/wholesale/domain/negotiation";
 import { publishAdminNotificationSafely } from "@/src/modules/admin-notifications/server/publisher";
+import { createOrderItemCommissionAllocation, type CommissionChannel } from "@/src/modules/finance/server/commissions";
 
 const publicId = (prefix: string) => `PAC-${prefix}-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`;
 
@@ -18,7 +19,7 @@ export async function checkout(userId: string, addressId: string, couponCode = "
   if (items.some(item => item.currency !== currency)) throw new Error("Mixed currency");
   const transaction = await db.createTransaction({ ttl: 120 });
   try {
-    const verified: Array<{ item: (typeof items)[number] }> = [];
+    const verified: Array<{ item: (typeof items)[number]; categoryId: string }> = [];
     for (const item of items) {
       const [offer, product, balances] = await Promise.all([
         db.getDocument({ databaseId, collectionId: "seller_offers", documentId: String(item.offerId), transactionId: transaction.$id }),
@@ -50,7 +51,7 @@ export async function checkout(userId: string, addressId: string, couponCode = "
         }
       }
       if (remaining > 0) throw new Error("Insufficient stock");
-      verified.push({ item });
+      verified.push({ item, categoryId: String(product.categoryId) });
     }
     const createdAt = new Date().toISOString(), subtotal = verified.reduce((sum, row) => sum + Number(row.item.unitPriceMinor) * Number(row.item.quantity), 0), promotion = await validateCoupon(db, transaction.$id, userId, couponCode, subtotal), total = subtotal - (promotion?.discountMinor ?? 0);
     await db.createDocument({ databaseId, collectionId: "orders", documentId: orderId, permissions: [], transactionId: transaction.$id, data: { orderNumber: publicId("ORD"), customerUserId: userId, addressId, currency, subtotalMinor: subtotal, totalMinor: total, status: "pending_payment", createdAt } });
@@ -59,7 +60,12 @@ export async function checkout(userId: string, addressId: string, couponCode = "
     for (const [vendorId, rows] of groups) {
       const vendorOrderId = ID.unique(), vendorSubtotal = rows.reduce((sum, row) => sum + Number(row.item.unitPriceMinor) * Number(row.item.quantity), 0);
       await db.createDocument({ databaseId, collectionId: "vendor_orders", documentId: vendorOrderId, permissions: [], transactionId: transaction.$id, data: { orderId, vendorId, vendorOrderNumber: publicId("VORD"), currency, subtotalMinor: vendorSubtotal, status: "new", createdAt } });
-      for (const { item } of rows) await db.createDocument({ databaseId, collectionId: "order_items", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { orderId, vendorOrderId, vendorId, productId: item.productId, ...(item.variantId ? { variantId: item.variantId } : {}), offerId: item.offerId, ...(item.negotiationId ? { negotiationId: item.negotiationId } : {}), ...(item.purchaseOrderId ? { purchaseOrderId: item.purchaseOrderId } : {}), productName: item.productName, sellerSku: item.sellerSku, quantity: item.quantity, unitPriceMinor: item.unitPriceMinor, lineTotalMinor: Number(item.unitPriceMinor) * Number(item.quantity), currency } });
+      for (const { item, categoryId } of rows) {
+        const orderItemId = ID.unique(), lineTotalMinor = Number(item.unitPriceMinor) * Number(item.quantity);
+        await db.createDocument({ databaseId, collectionId: "order_items", documentId: orderItemId, permissions: [], transactionId: transaction.$id, data: { orderId, vendorOrderId, vendorId, productId: item.productId, ...(item.variantId ? { variantId: item.variantId } : {}), offerId: item.offerId, ...(item.negotiationId ? { negotiationId: item.negotiationId } : {}), ...(item.purchaseOrderId ? { purchaseOrderId: item.purchaseOrderId } : {}), productName: item.productName, sellerSku: item.sellerSku, quantity: item.quantity, unitPriceMinor: item.unitPriceMinor, lineTotalMinor, currency } });
+        const channel: CommissionChannel = vendorId === "pacsm-platform" ? "pacsm_products" : item.negotiationId ? "negotiated_wholesale" : item.purchaseOrderId ? "wholesale" : "retail";
+        await createOrderItemCommissionAllocation(db, databaseId, transaction.$id, { orderId, vendorOrderId, orderItemId, vendorId, productId: String(item.productId), categoryId, channel, grossMinor: lineTotalMinor, currency, calculatedAt: createdAt });
+      }
     }
     for (const { item } of verified) {
       if (item.negotiationId) await db.updateDocument({ databaseId, collectionId: "price_negotiations", documentId: String(item.negotiationId), transactionId: transaction.$id, data: { status: "converted_to_order", orderId, usedAt: createdAt, updatedAt: createdAt } });

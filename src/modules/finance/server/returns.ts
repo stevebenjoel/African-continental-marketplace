@@ -17,12 +17,19 @@ export async function reviewReturn(input: { returnRequestId: string; action: "ap
     const now = new Date().toISOString();
     if (input.action === "reject") await databases.updateDocument({ databaseId, collectionId: "return_requests", documentId: request.$id, data: { status: "rejected", reviewedAt: now, ...(input.notes ? { reviewNotes: input.notes } : {}) }, transactionId: transaction.$id });
     else {
-      const rules = await databases.listDocuments({ databaseId, collectionId: "commission_rules", queries: [Query.equal("status", "active"), Query.orderDesc("effectiveFrom"), Query.limit(1)], transactionId: transaction.$id });
-      const gross = Number(vendorOrder.subtotalMinor), commission = Math.round(gross * Number(rules.documents[0]?.rateBasisPoints ?? 1000) / 10_000);
+      const allocations = await databases.listDocuments({ databaseId, collectionId: "commission_allocations", queries: [Query.equal("vendorOrderId", vendorOrder.$id), Query.limit(500)], transactionId: transaction.$id });
+      const gross = Number(vendorOrder.subtotalMinor);
+      let commission: number;
+      if (allocations.documents.length) commission = allocations.documents.reduce((sum, allocation) => sum + Number(allocation.pacsmMinor), 0);
+      else {
+        const rules = await databases.listDocuments({ databaseId, collectionId: "commission_rules", queries: [Query.equal("status", "active"), Query.orderDesc("effectiveFrom"), Query.limit(1)], transactionId: transaction.$id });
+        commission = Math.round(gross * Number(rules.documents[0]?.rateBasisPoints ?? 1000) / 10_000);
+      }
       await databases.createDocument({ databaseId, collectionId: "refunds", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { refundNumber: `PAC-REF-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`, returnRequestId: request.$id, orderId: request.orderId, vendorOrderId: request.vendorOrderId, customerUserId: request.customerUserId, vendorId: request.vendorId, amountMinor: gross, currency: vendorOrder.currency, status: "processed", provider: "simulated", createdAt: now, processedAt: now } });
       await databases.updateDocument({ databaseId, collectionId: "return_requests", documentId: request.$id, data: { status: "refunded", reviewedAt: now, ...(input.notes ? { reviewNotes: input.notes } : {}) }, transactionId: transaction.$id });
       await databases.updateDocument({ databaseId, collectionId: "vendor_orders", documentId: vendorOrder.$id, data: { status: "returned" }, transactionId: transaction.$id });
       await postRefundJournal(databases, databaseId, transaction.$id, { returnRequestId: request.$id, vendorId: String(request.vendorId), gross, commission, currency: String(vendorOrder.currency) });
+      for (const allocation of allocations.documents) await databases.updateDocument({ databaseId, collectionId:"commission_allocations", documentId:allocation.$id, transactionId:transaction.$id, data:{status:"reversed",reversedAt:now} });
     }
     await databases.createDocument({ databaseId, collectionId: "order_events", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { orderId: request.orderId, vendorOrderId: request.vendorOrderId, eventType: `return_${input.action === "approve" ? "refunded" : "rejected"}`, actorUserId: input.actorUserId, metadata: JSON.stringify({ notes: input.notes }), occurredAt: now } });
     await databases.createDocument({ databaseId, collectionId: "audit_logs", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { actorUserId: input.actorUserId, action: `return.${input.action}`, entityType: "return_request", entityId: request.$id, metadata: JSON.stringify({ vendorOrderId: request.vendorOrderId }), occurredAt: now } });

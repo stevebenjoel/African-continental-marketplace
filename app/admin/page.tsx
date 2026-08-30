@@ -16,7 +16,8 @@ const modules = [
   { name: "Wholesale Negotiations", value: "Open negotiation queue", note: "Accept, reject or counter PAC-SM and demo-product price requests", href: "/admin/wholesale-negotiations" },
   { name: "Vendors", value: "Review centre active", note: "Verification and activation queue", href: "/admin/vendors" },
   { name: "Returns", value: "Review centre active", note: "Buyer protection and refund decisions", href: "/admin/returns" },
-  { name: "Finance", value: "Ledger active", note: "Commission, journals and refunds", href: "/admin/finance" }
+  { name: "Finance", value: "Ledger & revenue controls", note: "Versioned commission rules, journals, refunds and settlements", href: "/admin/finance" }
+  ,{ name: "Commission Rules", value: "PAC-SM and vendor percentages", note: "Create, preview, schedule and audit channel or seller-specific revenue rules", href: "/admin/finance/commissions" }
   ,{ name: "Seller Withdrawals", value: "Review claims", note: "Approve or reject wallet claims through the central account", href: "/admin/withdrawals" }
   ,{ name: "Disputes", value: "Resolution centre active", note: "Customer protection cases", href: "/admin/disputes" }
   ,{ name: "Analytics", value: "Live dashboards", note: "Marketplace operating metrics", href: "/admin/analytics" }

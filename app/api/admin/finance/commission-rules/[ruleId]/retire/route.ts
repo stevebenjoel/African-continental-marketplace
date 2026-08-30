@@ -1,0 +1,4 @@
+import { requireSuperAdmin } from "@/src/modules/authorization/server/require-super-admin";
+import { retireCommissionRule } from "@/src/modules/finance/server/commissions";
+import { assertSameOrigin, publicAppUrl } from "@/src/modules/auth/server/request-security";
+export async function POST(request:Request,{params}:{params:Promise<{ruleId:string}>}){try{assertSameOrigin(request)}catch{return new Response("Forbidden",{status:403})}const user=await requireSuperAdmin(),form=await request.formData(),{ruleId}=await params;try{await retireCommissionRule(ruleId,user.$id,String(form.get("reason")??""));return Response.redirect(publicAppUrl("/admin/finance/commissions?retired=1"),303)}catch(error){console.error("Commission rule retirement failed",error);return Response.redirect(publicAppUrl("/admin/finance/commissions?error=retire"),303)}}
