@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { ID, Query } from "node-appwrite";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
@@ -10,7 +11,7 @@ async function withReadRetry<T>(operation: () => Promise<T>, attempts = 3): Prom
 export const listCategories = () => withReadRetry(() => db().listDocuments({ databaseId: databaseId(), collectionId: "categories", queries: [Query.equal("status", "active"), Query.limit(100)] }));
 export const listVendorProducts = (vendorId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("submittedByVendorId", vendorId), Query.orderDesc("submittedAt"), Query.limit(100)] });
 export const listModerationProducts = () => db().listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.orderDesc("submittedAt"), Query.limit(100)] });
-export async function listPublicProducts() {
+async function readPublicProducts() {
   const databases = db();
   const products = await withReadRetry(() => databases.listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("status", "approved"), Query.orderDesc("submittedAt"), Query.limit(100)] }));
   if (!products.documents.length) return [];
@@ -25,7 +26,9 @@ export async function listPublicProducts() {
   for (const balance of balances?.documents ?? []) { const offerId = String(balance.offerId); availability.set(offerId, (availability.get(offerId) ?? 0) + Number(balance.onHand) - Number(balance.reserved) - Number(balance.damaged)); }
   return products.documents.map(product => { const offer = cheapestOffers.get(product.$id); return offer ? { product, offer, available: availability.get(offer.$id) ?? 0, media: mediaByProduct.get(product.$id)?.[0] ?? null } : null; });
 }
+export const listPublicProducts = unstable_cache(readPublicProducts, ["public-catalogue-v1"], { revalidate: 300, tags: ["public-catalogue"] });
 export async function listPublicProductsFiltered(filters: { q?: string; category?: string; market?: string; sort?: string; availability?: string }) { const rows = (await listPublicProducts()).filter((row): row is NonNullable<typeof row> => row !== null); const query = filters.q?.trim().toLowerCase(); const filtered = rows.filter(row => (!query || `${row.product.name} ${row.product.description} ${row.product.brandName ?? ""}`.toLowerCase().includes(query)) && (!filters.category || row.product.categoryId === filters.category) && (!filters.market || (filters.market === "wholesale" ? Number(row.offer.minimumOrderQuantity) > 1 : Number(row.offer.minimumOrderQuantity) === 1)) && (filters.availability !== "in_stock" || row.available > 0)); return filtered.sort((a, b) => filters.sort === "price_low" ? Number(a.offer.retailPriceMinor) - Number(b.offer.retailPriceMinor) : filters.sort === "price_high" ? Number(b.offer.retailPriceMinor) - Number(a.offer.retailPriceMinor) : filters.sort === "name" ? String(a.product.name).localeCompare(String(b.product.name)) : 0); }
+export async function listPublicBrandProducts(aliases: readonly string[]) { const accepted = new Set(aliases.map(value => value.trim().toLowerCase())); return (await listPublicProducts()).filter((row): row is NonNullable<typeof row> => Boolean(row) && accepted.has(String(row?.product.brandName ?? "").trim().toLowerCase())); }
 export async function listPacsmProducts() { const rows = (await listPublicProducts()).filter(Boolean); return rows.filter(row => row && (String(row.product.brandName ?? "").toLowerCase().startsWith("pac-sm") || String(row.product.manufacturer ?? "").toLowerCase().startsWith("pac-sm"))); }
 export const getPublicProduct = cache(async (slug: string) => { const databases = db(); const products = await databases.listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("slug", slug), Query.equal("status", "approved"), Query.limit(1)] }); const product = products.documents[0]; if (!product) return null; const [variants, offers, mediaByProduct] = await Promise.all([databases.listDocuments({ databaseId: databaseId(), collectionId: "product_variants", queries: [Query.equal("productId", product.$id)] }), databases.listDocuments({ databaseId: databaseId(), collectionId: "seller_offers", queries: [Query.equal("productId", product.$id), Query.equal("status", "approved"), Query.limit(100)] }), listApprovedMediaForProducts([product.$id])]); const offerIds = offers.documents.map(offer => offer.$id), vendorIds = [...new Set(offers.documents.map(offer => String(offer.vendorId)))]; const [balances, stores] = await Promise.all([offerIds.length ? databases.listDocuments({ databaseId: databaseId(), collectionId: "inventory_balances", queries: [Query.equal("offerId", offerIds), Query.limit(5000)] }) : Promise.resolve({ documents: [] }), vendorIds.length ? databases.listDocuments({ databaseId: databaseId(), collectionId: "stores", queries: [Query.equal("vendorId", vendorIds), Query.equal("status", "active"), Query.limit(5000)] }) : Promise.resolve({ documents: [] })]); const stockByOffer = new Map<string, number>(); for (const balance of balances.documents) { const offerId = String(balance.offerId); stockByOffer.set(offerId, (stockByOffer.get(offerId) ?? 0) + Number(balance.onHand) - Number(balance.reserved) - Number(balance.damaged)); } const storeByVendor = new Map(stores.documents.map(store => [String(store.vendorId), store])); const enriched = offers.documents.map(offer => ({ offer, store: storeByVendor.get(String(offer.vendorId)), available: stockByOffer.get(offer.$id) ?? 0 })); return { product, variants: variants.documents, offers: enriched.filter((item): item is typeof item & { store: NonNullable<typeof item.store> } => Boolean(item.store)), media: mediaByProduct.get(product.$id) ?? [] }; });
 export const getPublicStore = cache(async (slug: string) => { const databases = db(); const stores = await databases.listDocuments({ databaseId: databaseId(), collectionId: "stores", queries: [Query.equal("slug", slug), Query.equal("status", "active"), Query.limit(1)] }); const store = stores.documents[0]; if (!store) return null; const vendor = await databases.getDocument({ databaseId: databaseId(), collectionId: "vendors", documentId: String(store.vendorId) }); if (!["approved", "active"].includes(String(vendor.status))) return null; const offers = await databases.listDocuments({ databaseId: databaseId(), collectionId: "seller_offers", queries: [Query.equal("vendorId", store.vendorId), Query.equal("status", "approved"), Query.limit(100)] }); const productIds = [...new Set(offers.documents.map(offer => String(offer.productId)))]; const result = productIds.length ? await databases.listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("$id", productIds), Query.equal("status", "approved"), Query.limit(100)] }) : { documents: [] }; const products = result.documents, mediaByProduct = await listApprovedMediaForProducts(products.map(product => product.$id)); return { store, vendor, offers: offers.documents, products, mediaByProduct }; });
@@ -40,6 +43,7 @@ export async function reviewProduct(productId: string, action: "approve" | "rest
     for (const offer of offers.documents) await databases.updateDocument({ databaseId: id, collectionId: "seller_offers", documentId: offer.$id, transactionId: transaction.$id, data: { status } });
     await databases.createDocument({ databaseId: id, collectionId: "audit_logs", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { actorUserId, action: `product.${action}`, entityType: "product", entityId: productId, metadata: JSON.stringify({ notes, status }), occurredAt: now } });
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    revalidateTag("public-catalogue", "max");
   } catch (error) { await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined); throw error; }
 }
 export async function submitProduct(input: { vendorId: string; actorUserId: string; name: string; slug: string; description: string; categoryId: string; brandName: string; manufacturer: string; countryOfOrigin: string; model: string; gtin: string; specifications: string; variantName: string; sku: string; variantAttributes: string; retailPriceMinor: number; wholesalePriceMinor?: number; currency: string; minimumOrderQuantity: number; fulfilmentMethod: string; processingDays: number }) {
@@ -50,6 +54,7 @@ export async function submitProduct(input: { vendorId: string; actorUserId: stri
     await databases.createDocument({ databaseId: id, collectionId: "seller_offers", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { vendorId: input.vendorId, productId, variantId, sellerSku: input.sku, retailPriceMinor: input.retailPriceMinor, ...(input.wholesalePriceMinor ? { wholesalePriceMinor: input.wholesalePriceMinor } : {}), currency: input.currency, minimumOrderQuantity: input.minimumOrderQuantity, fulfilmentMethod: input.fulfilmentMethod, processingDays: input.processingDays, status: "approved", submittedAt: now } });
     await databases.createDocument({ databaseId: id, collectionId: "audit_logs", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { actorUserId: input.actorUserId, action: "product.auto_publish", entityType: "product", entityId: productId, metadata: JSON.stringify({ vendorId: input.vendorId }), occurredAt: now } });
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    revalidateTag("public-catalogue", "max");
     return productId;
   } catch (error) { await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined); throw error; }
 }
@@ -64,6 +69,7 @@ export async function createAdminProduct(input: { name: string; description: str
     await databases.createDocument({ databaseId: databaseId(), collectionId: "inventory_balances", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { vendorId: "pacsm-demo-vendor", warehouseId: "pacsm-demo-warehouse", offerId, onHand: input.stock, reserved: 0, incoming: 0, damaged: 0, version: 1 } });
     await databases.createDocument({ databaseId: databaseId(), collectionId: "audit_logs", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { actorUserId: input.actorUserId, action: "product.admin_create", entityType: "product", entityId: productId, metadata: JSON.stringify({ marketType: input.marketType }), occurredAt: now } });
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    revalidateTag("public-catalogue", "max");
   } catch (error) { await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined); throw error; }
 }
 
@@ -71,6 +77,7 @@ export async function renameAdminProduct(productId: string, name: string, actorU
   if (name.trim().length < 3) throw new Error("Product name is too short");
   await db().updateDocument({ databaseId: databaseId(), collectionId: "products", documentId: productId, data: { name: name.trim() } });
   await db().createDocument({ databaseId: databaseId(), collectionId: "audit_logs", documentId: ID.unique(), permissions: [], data: { actorUserId, action: "product.rename", entityType: "product", entityId: productId, metadata: JSON.stringify({ name: name.trim() }), occurredAt: new Date().toISOString() } });
+  revalidateTag("public-catalogue", "max");
 }
 
 export async function deleteAdminProduct(productId: string, actorUserId: string) {
@@ -82,5 +89,6 @@ export async function deleteAdminProduct(productId: string, actorUserId: string)
     await databases.deleteDocument({ databaseId: databaseId(), collectionId: "products", documentId: productId, transactionId: transaction.$id });
     await databases.createDocument({ databaseId: databaseId(), collectionId: "audit_logs", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { actorUserId, action: "product.delete", entityType: "product", entityId: productId, metadata: "{}", occurredAt: new Date().toISOString() } });
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    revalidateTag("public-catalogue", "max");
   } catch (error) { await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined); throw error; }
 }

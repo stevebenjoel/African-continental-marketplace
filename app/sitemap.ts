@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
 import { listPublicSeoEntries } from "@/src/modules/catalogue/server/repository";
+import { BRAND_CATALOGUES } from "@/src/modules/catalogue/domain/brand-catalogue";
 
 const origin = process.env.APP_BASE_URL ?? "http://localhost:3000";
-const publicRoutes = ["", "/products", "/wholesale", "/pac-sm-products", "/offtakers", "/procurement", "/trade", "/logistics", "/standards", "/academy", "/faq", "/documentation", "/developers"];
+const publicRoutes = ["", "/products", "/wholesale", "/pac-sm-products", ...BRAND_CATALOGUES.map(brand => `/brands/${brand.slug}`), "/offtakers", "/procurement", "/trade", "/logistics", "/standards", "/academy", "/faq", "/documentation", "/developers"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
