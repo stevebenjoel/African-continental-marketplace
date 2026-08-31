@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { findBusinessBuyer, listBuyerPurchaseOrders, listPriceTiers, listWholesaleOffers } from "@/src/modules/wholesale/server/repository";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
@@ -8,6 +9,7 @@ import { listApprovedMediaForProducts } from "@/src/modules/catalogue/server/med
 import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Wholesale Marketplace", description: "Source verified African products in bulk, compare price tiers and negotiate commercial offers on PAC-SM.", alternates: { canonical: "/wholesale" }, openGraph: { title: "PAC-SM Wholesale Marketplace", description: "Verified bulk supply and protected wholesale transactions across Africa.", url: "/wholesale", type: "website" } };
 
 export default async function WholesalePage() {
   const [user, offers, pricing] = await Promise.all([getCurrentAppwriteUser(), listWholesaleOffers(), getCurrencyDisplay()]);

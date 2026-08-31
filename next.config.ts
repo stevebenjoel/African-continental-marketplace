@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  images: { formats: ["image/avif", "image/webp"], minimumCacheTTL: 86400 },
   experimental: { serverActions: { bodySizeLimit: "2mb" } },
   async headers() {
     return [{

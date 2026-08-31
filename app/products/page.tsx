@@ -1,9 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { listCategories, listPublicProductsFiltered } from "@/src/modules/catalogue/server/repository";
 import { getCurrencyDisplay } from "@/src/modules/localization/server/currency";
 import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Retail Marketplace", description: "Shop approved African products from verified PAC-SM sellers with protected checkout and tracked delivery.", alternates: { canonical: "/products" }, openGraph: { title: "PAC-SM Retail Marketplace", description: "Shop approved African products from verified marketplace sellers.", url: "/products", type: "website" } };
 type CatalogueQuery = { q?: string; category?: string; market?: string; sort?: string; availability?: string };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<CatalogueQuery> }) {

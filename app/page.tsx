@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import Image from "next/image";
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { getCart } from "@/src/modules/cart/server/repository";
@@ -9,6 +10,7 @@ import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
 import { accountGreeting } from "@/src/modules/auth/domain/display-name";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const categoryDesign: Record<string, { icon: string; color: string; tagline: string }> = {
   agriculture: { icon: "🌾", color: "sun", tagline: "Food, crops & ingredients" },

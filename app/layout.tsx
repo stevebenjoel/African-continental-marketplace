@@ -38,11 +38,14 @@ import "./admin-home-priority.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3000"),
-  title: "PAC-SM | Africa's Market. One Connected Continent.",
+  title: { default: "PAC-SM | Africa's Market. One Connected Continent.", template: "%s | PAC-SM" },
   description: "Pan-African retail, wholesale, procurement and trade infrastructure.",
+  applicationName: "PAC-SM",
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
   openGraph: {
     title: "PAC-SM | One market. One continent. Limitless trade.",
     description: "Pan-African retail, wholesale, procurement and trade infrastructure.",
+    url: "/", siteName: "PAC-SM", type: "website",
     images: [{ url: "/og.png", width: 1200, height: 630, alt: "PAC-SM — One market. One continent. Limitless trade." }]
   },
   twitter: { card: "summary_large_image", images: ["/og.png"] }
