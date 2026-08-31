@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
-import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
+import { ProductGallery } from "@/src/modules/catalogue/ui/product-gallery";
 import { listApprovedMediaForProducts } from "@/src/modules/catalogue/server/media";
 import { getCurrencyDisplay } from "@/src/modules/localization/server/currency";
 import { findBusinessBuyer, listPriceTiers } from "@/src/modules/wholesale/server/repository";
@@ -31,7 +31,7 @@ export default async function WholesaleProductPage({ params, searchParams }: { p
     <nav className="wholesale-detail-nav"><Link className="brand" href="/"><span>PAC</span><b>SM</b></Link><div><Link href="/wholesale">← All wholesale products</Link><Link href="/wholesale/negotiations">My negotiations</Link></div></nav>
     {(query.orderError || query.negotiationError) && <div className="wholesale-detail-alert">{query.orderError ? "We could not prepare checkout. Confirm the quantity, buyer approval and available stock." : "We could not submit the negotiation. Confirm the quantity, price and required information."}</div>}
     <section className="wholesale-product-focus">
-      <div className="wholesale-product-visual"><ProductImage media={media[0]} productName={String(product.name)} className="wholesale-detail-image"/><div className="wholesale-trust-row"><span>✓ Approved product</span><span>✓ Verified supply</span><span>✓ Secure payment</span></div></div>
+      <div className="wholesale-product-visual"><ProductGallery media={media.map(item=>({id:item.$id,altText:String(item.altText||product.name)}))} productName={String(product.name)} tone="wholesale"/><div className="wholesale-trust-row"><span>✓ Approved product</span><span>✓ Verified supply</span><span>✓ Secure payment</span></div></div>
       <div className="wholesale-product-intro"><span className="wholesale-eyebrow">WHOLESALE · {String(product.countryOfOrigin || "AF")} ORIGIN</span><h1>{String(product.name)}</h1><p>{String(product.description)}</p><div className="wholesale-price-lead"><small>Published wholesale price</small><strong>{pricing.format(basePrice, String(offer.currency))}</strong><span>per unit · MOQ {String(offer.minimumOrderQuantity)}</span></div><dl><div><dt>Seller SKU</dt><dd>{String(offer.sellerSku)}</dd></div><div><dt>Processing</dt><dd>{String(offer.processingDays)} business days</dd></div><div><dt>Fulfilment</dt><dd>{String(offer.fulfilmentMethod).replaceAll("_", " ")}</dd></div><div><dt>Maximum order</dt><dd>{offer.maximumOrderQuantity ? String(offer.maximumOrderQuantity) : "Contact seller"}</dd></div></dl></div>
     </section>
 

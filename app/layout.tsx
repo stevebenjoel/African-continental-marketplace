@@ -10,6 +10,7 @@ import "./inventory.css";
 import "./marketplace.css";
 import "./wholesale.css";
 import "./retail-marketplace.css";
+import "./product-gallery.css";
 import "./commerce-modules.css";
 import "./commerce-module-extras.css";
 import "./cart.css";
