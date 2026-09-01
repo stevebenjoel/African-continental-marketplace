@@ -13,5 +13,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"]
+  // The image optimizer fetches this controlled route through the container's
+  // internal host. Redirecting that self-request to the public canonical host
+  // makes Next reject the response as an invalid upstream image in production.
+  matcher: ["/((?!_next/static|_next/image|api/catalogue/media|favicon.ico|.*\\..*).*)"]
 };
