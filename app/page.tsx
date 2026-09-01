@@ -3,12 +3,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { getCart } from "@/src/modules/cart/server/repository";
-import { listCategories, listPublicProducts } from "@/src/modules/catalogue/server/repository";
+import { listCategories, listFeaturedPublicProducts, listPublicProducts } from "@/src/modules/catalogue/server/repository";
 import { getCurrencyDisplay, type CurrencyDisplay } from "@/src/modules/localization/server/currency";
 import { getTranslator } from "@/src/modules/localization/server/language";
 import { ProductImage } from "@/src/modules/catalogue/ui/product-image";
 import { accountGreeting } from "@/src/modules/auth/domain/display-name";
 import { BRAND_CATALOGUES } from "@/src/modules/catalogue/domain/brand-catalogue";
+import { selectFeaturedProducts } from "@/src/modules/catalogue/domain/featured-products";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -32,10 +33,11 @@ function ProductCard({ item, index, pricing }: { item: ProductRow; index: number
 }
 
 export default async function Home() {
-  const [user, categories, rawProducts, pricing, translator] = await Promise.all([getCurrentAppwriteUser(), listCategories(), listPublicProducts(), getCurrencyDisplay(), getTranslator()]);
+  const [user, categories, rawProducts, rawFeaturedProducts, pricing, translator] = await Promise.all([getCurrentAppwriteUser(), listCategories(), listPublicProducts(), listFeaturedPublicProducts(), getCurrencyDisplay(), getTranslator()]);
   const { t } = translator;
   const products = rawProducts.filter((item): item is ProductRow => Boolean(item));
-  const retail = products.filter(item => Number(item.offer.minimumOrderQuantity) === 1).slice(0, 10);
+  const featuredRetail = rawFeaturedProducts.filter(item => Number(item.offer.minimumOrderQuantity) === 1);
+  const retail = selectFeaturedProducts(featuredRetail, products.filter(item => Number(item.offer.minimumOrderQuantity) === 1));
   const wholesale = products.filter(item => Number(item.offer.minimumOrderQuantity) > 1).slice(0, 10);
   const cartCount = user ? (await getCart(user.$id)).items.reduce((sum, item) => sum + Number(item.quantity), 0) : 0;
   return <main className="commerce-home">

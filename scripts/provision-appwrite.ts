@@ -30,11 +30,12 @@ const storage = new Storage(client);
 const databases = new Databases(client);
 const databaseId = required("APPWRITE_DATABASE_ID");
 
-type Attribute = { key: string; type: "string" | "integer" | "datetime"; size?: number; required?: boolean; array?: boolean; encrypt?: boolean };
+type Attribute = { key: string; type: "string" | "integer" | "datetime" | "boolean"; size?: number; required?: boolean; array?: boolean; encrypt?: boolean; default?: boolean };
 type Index = { key: string; type: "key" | "unique"; attributes: string[] };
 const s = (key: string, size: number, required = false): Attribute => ({ key, type: "string", size, required });
 const dt = (key: string, required = false): Attribute => ({ key, type: "datetime", required });
 const i = (key: string, required = false): Attribute => ({ key, type: "integer", required });
+const b = (key: string, required = false, defaultValue?: boolean): Attribute => ({ key, type: "boolean", required, default: defaultValue });
 const secret = (key: string, size: number): Attribute => ({ key, type: "string", size: Math.max(150, size), required: true, encrypt: true });
 const idx = (key: string, type: "key" | "unique", attributes: string[]): Index => ({ key, type, attributes });
 
@@ -50,7 +51,7 @@ const collections: { id: string; name: string; attributes: Attribute[]; indexes:
   { id: "audit_logs", name: "Audit Logs", attributes: [s("actorUserId", 36, true), s("action", 100, true), s("entityType", 60, true), s("entityId", 36, true), s("metadata", 10000), dt("occurredAt", true)], indexes: [idx("audit_entity_idx", "key", ["entityType", "entityId"]), idx("audit_actor_idx", "key", ["actorUserId"])] }
   ,{ id: "categories", name: "Catalogue Categories", attributes: [s("name", 120, true), s("slug", 120, true), s("parentId", 36), s("status", 24, true)], indexes: [idx("category_slug_unique", "unique", ["slug"]), idx("category_status_idx", "key", ["status"])] }
   ,{ id: "brands", name: "Catalogue Brands", attributes: [s("name", 120, true), s("slug", 120, true), s("status", 24, true)], indexes: [idx("brand_slug_unique", "unique", ["slug"])] }
-  ,{ id: "products", name: "Canonical Products", attributes: [s("submittedByVendorId", 36, true), s("name", 240, true), s("slug", 240, true), s("description", 5000, true), s("categoryId", 36, true), s("brandName", 120), s("manufacturer", 180), s("countryOfOrigin", 2, true), s("model", 120), s("gtin", 32), s("specifications", 10000), s("status", 32, true), dt("submittedAt", true), s("reviewedBy", 36), dt("reviewedAt")], indexes: [idx("product_slug_unique", "unique", ["slug"]), idx("product_vendor_idx", "key", ["submittedByVendorId"]), idx("product_status_idx", "key", ["status"]), idx("product_category_idx", "key", ["categoryId"])] }
+  ,{ id: "products", name: "Canonical Products", attributes: [s("submittedByVendorId", 36, true), s("name", 240, true), s("slug", 240, true), s("description", 5000, true), s("categoryId", 36, true), s("brandName", 120), s("manufacturer", 180), s("countryOfOrigin", 2, true), s("model", 120), s("gtin", 32), s("specifications", 10000), s("status", 32, true), b("featured", false, false), dt("submittedAt", true), s("reviewedBy", 36), dt("reviewedAt")], indexes: [idx("product_slug_unique", "unique", ["slug"]), idx("product_vendor_idx", "key", ["submittedByVendorId"]), idx("product_status_idx", "key", ["status"]), idx("product_category_idx", "key", ["categoryId"]), idx("product_featured_idx", "key", ["status", "featured"])] }
   ,{ id: "product_media", name: "Product Media", attributes: [s("productId", 36, true), s("vendorId", 36, true), s("bucketId", 36, true), s("fileId", 36, true), s("filename", 255, true), s("mimeType", 100, true), i("sizeBytes", true), s("altText", 180, true), i("sortOrder", true), s("isPrimary", 5, true), s("status", 24, true), dt("uploadedAt", true), dt("reviewedAt"), s("reviewedBy", 36), s("reviewNotes", 1000)], indexes: [idx("media_product_idx", "key", ["productId"]), idx("media_product_status_idx", "key", ["productId", "status"]), idx("media_product_sort_idx", "key", ["productId", "sortOrder"]), idx("media_vendor_idx", "key", ["vendorId"]), idx("media_file_unique", "unique", ["fileId"])] }
   ,{ id: "product_variants", name: "Product Variants", attributes: [s("productId", 36, true), s("name", 180, true), s("sku", 100, true), s("barcode", 64), s("attributes", 5000, true), i("weightGrams"), s("status", 24, true)], indexes: [idx("variant_product_idx", "key", ["productId"]), idx("variant_sku_unique", "unique", ["sku"])] }
   ,{ id: "seller_offers", name: "Seller Offers", attributes: [s("vendorId", 36, true), s("productId", 36, true), s("variantId", 36), s("sellerSku", 100, true), i("retailPriceMinor", true), i("wholesalePriceMinor"), i("promotionalPriceMinor"), s("currency", 3, true), i("minimumOrderQuantity", true), i("maximumOrderQuantity"), s("fulfilmentMethod", 40, true), i("processingDays", true), s("status", 32, true), dt("submittedAt", true)], indexes: [idx("offer_vendor_idx", "key", ["vendorId"]), idx("offer_product_idx", "key", ["productId"]), idx("offer_sku_vendor_unique", "unique", ["vendorId", "sellerSku"]), idx("offer_status_idx", "key", ["status"])] }
@@ -195,6 +196,7 @@ for (const collection of collections.filter((item) => !collectionPrefix || item.
     const common = { databaseId, collectionId: collection.id, key: attribute.key, required: attribute.required ?? false, array: attribute.array ?? false };
     if (attribute.type === "string") await databases.createStringAttribute({ ...common, size: attribute.size!, encrypt: attribute.encrypt ?? false });
     else if (attribute.type === "integer") await databases.createIntegerAttribute(common);
+    else if (attribute.type === "boolean") await databases.createBooleanAttribute({ ...common, xdefault: attribute.default });
     else await databases.createDatetimeAttribute(common);
     for (let attempt = 0; attempt < 30; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 500));

@@ -11,7 +11,7 @@ type CatalogueDocument = Models.Document & Record<string, unknown>;
 async function withReadRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> { let error: unknown; for (let attempt = 0; attempt < attempts; attempt++) { try { return await operation(); } catch (reason) { error = reason; if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1))); } } throw error; }
 export const listCategories = () => withReadRetry(() => db().listDocuments({ databaseId: databaseId(), collectionId: "categories", queries: [Query.equal("status", "active"), Query.limit(100)] }));
 export const listVendorProducts = (vendorId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("submittedByVendorId", vendorId), Query.orderDesc("submittedAt"), Query.limit(100)] });
-export const listModerationProducts = () => db().listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.orderDesc("submittedAt"), Query.limit(100)] });
+export const listModerationProducts = () => db().listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.orderDesc("submittedAt"), Query.limit(5000)] });
 async function readPublicProducts() {
   const databases = db();
   const products = await withReadRetry(() => databases.listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("status", "approved"), Query.orderDesc("submittedAt"), Query.limit(100)] }));
@@ -32,6 +32,7 @@ async function enrichPublicProducts(products: CatalogueDocument[]) {
   return products.map(product => { const offer = cheapestOffers.get(product.$id); return offer ? { product, offer, available: availability.get(offer.$id) ?? 0, media: mediaByProduct.get(product.$id)?.[0] ?? null } : null; });
 }
 export const listPublicProducts = unstable_cache(readPublicProducts, ["public-catalogue-v1"], { revalidate: 300, tags: ["public-catalogue"] });
+export async function listFeaturedPublicProducts() { const products = await withReadRetry(() => db().listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("status", "approved"), Query.equal("featured", true), Query.orderDesc("submittedAt"), Query.limit(100)] })); return (await enrichPublicProducts(products.documents as CatalogueDocument[])).filter((row): row is NonNullable<typeof row> => Boolean(row)); }
 export async function listPublicProductsFiltered(filters: { q?: string; category?: string; market?: string; sort?: string; availability?: string }) { const rows = (await listPublicProducts()).filter((row): row is NonNullable<typeof row> => row !== null); const query = filters.q?.trim().toLowerCase(); const filtered = rows.filter(row => (!query || `${row.product.name} ${row.product.description} ${row.product.brandName ?? ""}`.toLowerCase().includes(query)) && (!filters.category || row.product.categoryId === filters.category) && (!filters.market || (filters.market === "wholesale" ? Number(row.offer.minimumOrderQuantity) > 1 : Number(row.offer.minimumOrderQuantity) === 1)) && (filters.availability !== "in_stock" || row.available > 0)); return filtered.sort((a, b) => filters.sort === "price_low" ? Number(a.offer.retailPriceMinor) - Number(b.offer.retailPriceMinor) : filters.sort === "price_high" ? Number(b.offer.retailPriceMinor) - Number(a.offer.retailPriceMinor) : filters.sort === "name" ? String(a.product.name).localeCompare(String(b.product.name)) : 0); }
 export async function listPublicBrandProducts(aliases: readonly string[]) { const products = await withReadRetry(() => db().listDocuments({ databaseId: databaseId(), collectionId: "products", queries: [Query.equal("status", "approved"), Query.equal("brandName", [...aliases]), Query.orderDesc("submittedAt"), Query.limit(5000)] })); return (await enrichPublicProducts(products.documents as CatalogueDocument[])).filter((row): row is NonNullable<typeof row> => Boolean(row)); }
 export async function listPacsmProducts() { const rows = (await listPublicProducts()).filter(Boolean); return rows.filter(row => row && (String(row.product.brandName ?? "").toLowerCase().startsWith("pac-sm") || String(row.product.manufacturer ?? "").toLowerCase().startsWith("pac-sm"))); }
@@ -82,6 +83,14 @@ export async function renameAdminProduct(productId: string, name: string, actorU
   if (name.trim().length < 3) throw new Error("Product name is too short");
   await db().updateDocument({ databaseId: databaseId(), collectionId: "products", documentId: productId, data: { name: name.trim() } });
   await db().createDocument({ databaseId: databaseId(), collectionId: "audit_logs", documentId: ID.unique(), permissions: [], data: { actorUserId, action: "product.rename", entityType: "product", entityId: productId, metadata: JSON.stringify({ name: name.trim() }), occurredAt: new Date().toISOString() } });
+  revalidateTag("public-catalogue", "max");
+}
+
+export async function setProductFeatured(productId: string, featured: boolean, actorUserId: string) {
+  const databases = db(), product = await databases.getDocument({ databaseId: databaseId(), collectionId: "products", documentId: productId });
+  if (featured && String(product.status) !== "approved") throw new Error("Only an approved product can be featured");
+  await databases.updateDocument({ databaseId: databaseId(), collectionId: "products", documentId: productId, data: { featured } });
+  await databases.createDocument({ databaseId: databaseId(), collectionId: "audit_logs", documentId: ID.unique(), permissions: [], data: { actorUserId, action: featured ? "product.feature" : "product.unfeature", entityType: "product", entityId: productId, metadata: JSON.stringify({ featured, name: String(product.name) }), occurredAt: new Date().toISOString() } });
   revalidateTag("public-catalogue", "max");
 }
 
