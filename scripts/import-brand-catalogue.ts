@@ -33,11 +33,23 @@ const ownerUserId = process.env.DIPLOMATS_STORES_OWNER_USER_ID?.trim() || "6a8b7
 const warehouseId = process.env.DIPLOMATS_STORES_WAREHOUSE_ID?.trim() || "6a8b930e0023f4911c4b";
 const originCountry = (argument("--origin-country") || "ZZ").toUpperCase();
 if (!/^[A-Z]{2}$/.test(originCountry)) throw new Error("--origin-country must be a two-letter code; omit it to record unknown origin as ZZ");
-const categoryMap: Record<string, string> = { "Cold Storage": "home", "Garment Care": "home", "Kitchen Appliances": "home", "Air Cooling": "home", "Power Solutions": "electronics" };
+const categoryMap: Record<string, string> = { "Cold Storage": "home", "Garment Care": "home", "Kitchen Appliances": "home", "Air Cooling": "home", "Power Solutions": "electronics", "Sound and Vision": "electronics" };
 const slugify = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 190);
 const safeId = (prefix: string, externalId: string) => `${prefix}-${externalId.replace(/[^a-zA-Z0-9._-]/g, "-")}`.slice(0, 36);
-const imageUrls = (row: CsvRow) => [1,2,3,4,5].map(index => row[`image_url_${index}`]).filter(Boolean);
+const imageUrls = (row: CsvRow) => Array.from({ length: 15 }, (_, index) => row[`image_url_${index + 1}`]).filter(Boolean);
+async function fetchImage(url: string) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try { return await fetch(url, { signal: AbortSignal.timeout(30000) }); }
+    catch (error) { if (attempt === 3) { console.warn(`skipped image after ${attempt} network attempts: ${url}`, error); return null; } }
+  }
+  return null;
+}
 const brand = rows[0]?.brand || "Imported Brand";
+if (rows.some(row => row.brand.toLowerCase() !== brand.toLowerCase())) throw new Error("Every row in one import must use the same brand");
+const brandKey = slugify(brand).slice(0, 12) || "brand";
+const idPrefixes = brandKey === "thermocool"
+  ? { product: "thermocool", variant: "tcv", offer: "tco", balance: "tcb", media: "tcm", sku: "THC" }
+  : { product: brandKey, variant: `${brandKey}v`, offer: `${brandKey}o`, balance: `${brandKey}b`, media: `${brandKey}m`, sku: brandKey.toUpperCase().slice(0, 8) };
 if (!apply) { console.log(JSON.stringify({ mode: "dry-run", source: basename(csvPath), brand, products: rows.length, categories: [...new Set(rows.map(row => row.category))], imagesReferenced: rows.reduce((sum, row) => sum + imageUrls(row).length, 0), accountingOwner: { vendorId, ownerUserId, warehouseId }, stockPolicy: "zero until Diplomats Stores confirms physical inventory", mediaPolicy: "not copied without --confirm-media-rights" }, null, 2)); process.exit(0); }
 
 const runtimeKey = process.env.APPWRITE_API_KEY?.trim() || readFileSync(required("APPWRITE_API_KEY_FILE"), "utf8").trim();
@@ -46,17 +58,29 @@ const databases = new Databases(client), storage = new Storage(client), database
 const [vendor, store, warehouse] = await Promise.all([databases.getDocument({ databaseId, collectionId: "vendors", documentId: vendorId }), databases.listDocuments({ databaseId, collectionId: "stores", queries: [Query.equal("vendorId", vendorId), Query.equal("status", "active"), Query.limit(1)] }), databases.getDocument({ databaseId, collectionId: "warehouses", documentId: warehouseId })]);
 if (!["approved","active"].includes(String(vendor.status)) || !store.documents[0] || String(warehouse.vendorId) !== vendorId || warehouse.status !== "active") throw new Error("Diplomats Stores vendor, active store or warehouse validation failed");
 
-let mediaImported = 0;
+let mediaImported = 0, mediaSkipped = 0;
 for (let index = 0; index < rows.length; index++) {
-  const row = rows[index], productId = safeId("thermocool", row.product_id), variantId = safeId("tcv", row.product_id), offerId = safeId("tco", row.product_id), balanceId = safeId("tcb", row.product_id), categoryId = categoryMap[row.category] ?? "home", slug = `${slugify(row.product_name)}-${row.product_id}`, priceMinor = Math.round(Number(row.price_ngn) * 100), sku = `DIP-THC-${row.model.replace(/[^A-Za-z0-9-]/g, "-")}`.slice(0, 100), urls = imageUrls(row);
+  const row = rows[index], productId = safeId(idPrefixes.product, row.product_id), variantId = safeId(idPrefixes.variant, row.product_id), offerId = safeId(idPrefixes.offer, row.product_id), balanceId = safeId(idPrefixes.balance, row.product_id), categoryId = categoryMap[row.category] ?? "home", slug = `${slugify(row.product_name)}-${brandKey}-${row.product_id}`, priceMinor = Math.round(Number(row.price_ngn) * 100), sku = `DIP-${idPrefixes.sku}-${row.model.replace(/[^A-Za-z0-9-]/g, "-")}`.slice(0, 100), urls = imageUrls(row);
   const description = `${row.product_name} is a ${row.category.toLowerCase()} product in the ${brand} range. Model ${row.model}. Supplied on PAC-SM by Diplomats Stores; availability is confirmed before checkout.`;
   const specifications = JSON.stringify({ importFormat: "brand_catalogue_v1", sourceProductId: row.product_id, sourceCategory: row.category, model: row.model, priceSource: row.price_source, priceSourceUrl: row.price_source_url, productPageUrl: row.product_page_url, officialCatalogUrl: row.official_catalog_url, sourceCheckedDate: row.checked_date, sourceStockStatus: row.stock_status, sourceGalleryStatus: row.gallery_source_status, sourceImageUrls: urls, accountingOwner: "Diplomats Stores", countryOfOriginStatus: originCountry === "ZZ" ? "not supplied by source" : "supplier confirmed" });
   await databases.upsertDocument({ databaseId, collectionId: "products", documentId: productId, permissions: [], data: { submittedByVendorId: vendorId, name: row.product_name, slug, description, categoryId, brandName: brand, manufacturer: brand, countryOfOrigin: originCountry, model: row.model, specifications, status: "approved", submittedAt: now, reviewedBy: ownerUserId, reviewedAt: now } });
   await databases.upsertDocument({ databaseId, collectionId: "product_variants", documentId: variantId, permissions: [], data: { productId, name: row.model, sku, attributes: JSON.stringify({ model: row.model, sourceCategory: row.category }), status: "approved" } });
   await databases.upsertDocument({ databaseId, collectionId: "seller_offers", documentId: offerId, permissions: [], data: { vendorId, productId, variantId, sellerSku: sku, retailPriceMinor: priceMinor, currency: "NGN", minimumOrderQuantity: 1, maximumOrderQuantity: 20, fulfilmentMethod: "seller_fulfilled", processingDays: 3, status: "approved", submittedAt: now } });
   await databases.upsertDocument({ databaseId, collectionId: "inventory_balances", documentId: balanceId, permissions: [], data: { vendorId, warehouseId, offerId, onHand: 0, reserved: 0, incoming: 0, damaged: 0, version: 1 } });
-  if (confirmMediaRights) for (let imageIndex = 0; imageIndex < urls.length; imageIndex++) { const existing = await databases.listDocuments({ databaseId, collectionId: "product_media", queries: [Query.equal("productId", productId), Query.equal("sortOrder", imageIndex), Query.limit(1)] }); if (existing.total) continue; const response = await fetch(urls[imageIndex], { signal: AbortSignal.timeout(30000) }); if (!response.ok) throw new Error(`Image download failed ${response.status}: ${urls[imageIndex]}`); const mimeType = response.headers.get("content-type")?.split(";")[0].toLowerCase() ?? "", buffer = Buffer.from(await response.arrayBuffer()); if (!["image/jpeg","image/png","image/webp"].includes(mimeType) || buffer.length < 1 || buffer.length > 8 * 1024 * 1024) throw new Error(`Unsupported image response (${mimeType || "unknown"}, ${buffer.length} bytes): ${urls[imageIndex]}`); const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : ".jpg", fileId = safeId(`tcm-${row.product_id}`, String(imageIndex + 1)), filename = `${slugify(row.model)}-${imageIndex + 1}${extension}`; try { await storage.createFile({ bucketId, fileId, file: InputFile.fromBuffer(buffer, filename), permissions: [] }); } catch (error) { if (!(typeof error === "object" && error && "code" in error && Number(error.code) === 409)) throw error; } await databases.upsertDocument({ databaseId, collectionId: "product_media", documentId: fileId, permissions: [], data: { productId, vendorId, bucketId, fileId, filename, mimeType, sizeBytes: buffer.length, altText: `${row.product_name} view ${imageIndex + 1}`, sortOrder: imageIndex, isPrimary: imageIndex === 0 ? "true" : "false", status: "approved", uploadedAt: now, reviewedAt: now, reviewedBy: ownerUserId, reviewNotes: `Imported after explicit media-rights confirmation from ${row.price_source}` } }); mediaImported++; }
+  if (confirmMediaRights) for (let imageIndex = 0; imageIndex < urls.length; imageIndex++) {
+    const existing = await databases.listDocuments({ databaseId, collectionId: "product_media", queries: [Query.equal("productId", productId), Query.equal("sortOrder", imageIndex), Query.limit(1)] });
+    if (existing.total) continue;
+    const response = await fetchImage(urls[imageIndex]);
+    if (!response) { mediaSkipped++; continue; }
+    if (!response.ok) { mediaSkipped++; console.warn(`skipped unavailable image ${response.status}: ${urls[imageIndex]}`); continue; }
+    const mimeType = response.headers.get("content-type")?.split(";")[0].toLowerCase() ?? "", buffer = Buffer.from(await response.arrayBuffer());
+    if (!["image/jpeg","image/png","image/webp"].includes(mimeType) || buffer.length < 1 || buffer.length > 8 * 1024 * 1024) { mediaSkipped++; console.warn(`skipped unsupported image (${mimeType || "unknown"}, ${buffer.length} bytes): ${urls[imageIndex]}`); continue; }
+    const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : ".jpg", fileId = safeId(`${idPrefixes.media}-${row.product_id}`, String(imageIndex + 1)), filename = `${slugify(row.model)}-${imageIndex + 1}${extension}`;
+    try { await storage.createFile({ bucketId, fileId, file: InputFile.fromBuffer(buffer, filename), permissions: [] }); } catch (error) { if (!(typeof error === "object" && error && "code" in error && Number(error.code) === 409)) throw error; }
+    await databases.upsertDocument({ databaseId, collectionId: "product_media", documentId: fileId, permissions: [], data: { productId, vendorId, bucketId, fileId, filename, mimeType, sizeBytes: buffer.length, altText: `${row.product_name} view ${imageIndex + 1}`, sortOrder: imageIndex, isPrimary: imageIndex === 0 ? "true" : "false", status: "approved", uploadedAt: now, reviewedAt: now, reviewedBy: ownerUserId, reviewNotes: `Imported after explicit media-rights confirmation from ${row.price_source}` } });
+    mediaImported++;
+  }
   process.stdout.write(`imported ${index + 1}/${rows.length} ${row.model}\n`);
 }
-await databases.createDocument({ databaseId, collectionId: "audit_logs", documentId: ID.unique(), permissions: [], data: { actorUserId: ownerUserId, action: "catalogue.brand_import", entityType: "vendor", entityId: vendorId, metadata: JSON.stringify({ source: basename(csvPath), brand, products: rows.length, mediaImported, mediaRightsConfirmed: confirmMediaRights }), occurredAt: now } });
-console.log(JSON.stringify({ status: "complete", products: rows.length, mediaImported, brand, store: store.documents[0].name, source: basename(csvPath) }, null, 2));
+await databases.createDocument({ databaseId, collectionId: "audit_logs", documentId: ID.unique(), permissions: [], data: { actorUserId: ownerUserId, action: "catalogue.brand_import", entityType: "vendor", entityId: vendorId, metadata: JSON.stringify({ source: basename(csvPath), brand, products: rows.length, mediaImported, mediaSkipped, mediaRightsConfirmed: confirmMediaRights }), occurredAt: now } });
+console.log(JSON.stringify({ status: "complete", products: rows.length, mediaImported, mediaSkipped, brand, store: store.documents[0].name, source: basename(csvPath) }, null, 2));
