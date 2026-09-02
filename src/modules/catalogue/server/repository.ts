@@ -5,6 +5,7 @@ import { ID, Models, Query } from "node-appwrite";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
 import { listApprovedMediaForProducts } from "@/src/modules/catalogue/server/media";
+import type { BulkProductInput } from "@/src/modules/catalogue/domain/bulk-products";
 const databaseId = () => env().APPWRITE_DATABASE_ID;
 const db = () => createAppwriteDatabaseClient().databases;
 type CatalogueDocument = Models.Document & Record<string, unknown>;
@@ -62,6 +63,23 @@ export async function submitProduct(input: { vendorId: string; actorUserId: stri
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
     revalidateTag("public-catalogue", "max");
     return productId;
+  } catch (error) { await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined); throw error; }
+}
+
+export async function submitProductsBulk(vendorId: string, actorUserId: string, inputs: BulkProductInput[]) {
+  if (!inputs.length || inputs.length > 50) throw new Error("Bulk product count is invalid");
+  const databases = db(), transaction = await databases.createTransaction({ ttl: 120 }), now = new Date().toISOString(), id = databaseId(), productIds: string[] = [];
+  try {
+    for (const input of inputs) {
+      const productId = ID.unique(), variantId = ID.unique(); productIds.push(productId);
+      await databases.createDocument({ databaseId: id, collectionId: "products", documentId: productId, permissions: [], transactionId: transaction.$id, data: { submittedByVendorId: vendorId, name: input.name, slug: input.slug, description: input.description, categoryId: input.categoryId, ...(input.brandName ? { brandName: input.brandName } : {}), ...(input.manufacturer ? { manufacturer: input.manufacturer } : {}), countryOfOrigin: input.countryOfOrigin, ...(input.model ? { model: input.model } : {}), ...(input.gtin ? { gtin: input.gtin } : {}), specifications: input.specifications, status: "approved", featured: false, submittedAt: now, reviewedBy: actorUserId, reviewedAt: now } });
+      await databases.createDocument({ databaseId: id, collectionId: "product_variants", documentId: variantId, permissions: [], transactionId: transaction.$id, data: { productId, name: input.variantName, sku: input.sku, attributes: input.variantAttributes, status: "approved" } });
+      await databases.createDocument({ databaseId: id, collectionId: "seller_offers", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { vendorId, productId, variantId, sellerSku: input.sku, retailPriceMinor: input.retailPriceMinor, ...(input.wholesalePriceMinor ? { wholesalePriceMinor: input.wholesalePriceMinor } : {}), currency: input.currency, minimumOrderQuantity: input.minimumOrderQuantity, fulfilmentMethod: input.fulfilmentMethod, processingDays: input.processingDays, status: "approved", submittedAt: now } });
+    }
+    await databases.createDocument({ databaseId: id, collectionId: "audit_logs", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { actorUserId, action: "product.bulk_publish", entityType: "vendor", entityId: vendorId, metadata: JSON.stringify({ count: inputs.length, productIds }), occurredAt: now } });
+    await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    revalidateTag("public-catalogue", "max");
+    return productIds;
   } catch (error) { await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined); throw error; }
 }
 

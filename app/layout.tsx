@@ -5,6 +5,7 @@ import "./auth-extras.css";
 import "./admin.css";
 import "./vendor.css";
 import "./seller.css";
+import "./bulk-products.css";
 import "./catalogue.css";
 import "./featured-products.css";
 import "./inventory.css";
