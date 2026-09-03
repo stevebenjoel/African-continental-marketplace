@@ -8,6 +8,7 @@ import "./seller.css";
 import "./bulk-products.css";
 import "./product-programs.css";
 import "./product-program-visibility.css";
+import "./product-intents.css";
 import "./catalogue.css";
 import "./featured-products.css";
 import "./inventory.css";

@@ -27,7 +27,7 @@ export async function checkout(userId: string, addressId: string, couponCode = "
         db.getDocument({ databaseId, collectionId: "products", documentId: String(item.productId), transactionId: transaction.$id }),
         db.listDocuments({ databaseId, collectionId: "inventory_balances", queries: [Query.equal("offerId", item.offerId), Query.limit(100)], transactionId: transaction.$id })
       ]);
-      let validPrice = Number(offer.retailPriceMinor) === Number(item.unitPriceMinor);
+      let validPrice = Number(offer.retailPriceMinor) === Number(item.unitPriceMinor), negotiationType = "";
       if (item.purchaseOrderId) {
         const [purchaseOrder, purchaseOrderItems] = await Promise.all([
           db.getDocument({ databaseId, collectionId: "purchase_orders", documentId: String(item.purchaseOrderId), transactionId: transaction.$id }),
@@ -38,6 +38,7 @@ export async function checkout(userId: string, addressId: string, couponCode = "
       }
       if (item.negotiationId) {
         const negotiation = await db.getDocument({ databaseId, collectionId: "price_negotiations", documentId: String(item.negotiationId), transactionId: transaction.$id });
+        negotiationType = String(negotiation.negotiationType ?? "price");
         const validNegotiation = negotiation.buyerUserId === userId && negotiation.offerId === item.offerId && Number(negotiation.quantity) === Number(item.quantity) && Number(negotiation.currentUnitPriceMinor) === Number(item.unitPriceMinor) && negotiation.currency === item.currency && isAcceptedNegotiationUsable(String(negotiation.status), String(negotiation.expiresAt), negotiation.usedAt);
         validPrice = item.purchaseOrderId ? validPrice && validNegotiation : validNegotiation;
       }
@@ -48,8 +49,9 @@ export async function checkout(userId: string, addressId: string, couponCode = "
         if (!preorderIsOpen(program) || String(program.estimatedDispatchAt) !== String(item.promisedDispatchAt)) throw new Error("Pre-order changed");
         await db.incrementDocumentAttribute({ databaseId, collectionId: "product_programs", documentId: program.$id, attribute: "preorderReserved", value: Number(item.quantity), max: Number(program.preorderCapacity), transactionId: transaction.$id });
       } else if (purchaseType === "white_label") {
-        const program = await db.getDocument({ databaseId, collectionId: "product_programs", documentId: String(item.offerId), transactionId: transaction.$id });
-        if (!program.whiteLabelEnabled || Number(item.quantity) < Number(program.whiteLabelMinimumQuantity) || !item.brandingName || String(item.customizationBrief ?? "").length < 20) throw new Error("White-label programme changed");
+        const program = await db.getDocument({ databaseId, collectionId: "product_programs", documentId: String(item.offerId), transactionId: transaction.$id }).catch(() => null);
+        const negotiatedWhiteLabel = negotiationType === "white_label" && Boolean(item.negotiationId);
+        if ((!negotiatedWhiteLabel && (!program?.whiteLabelEnabled || Number(item.quantity) < Number(program.whiteLabelMinimumQuantity))) || !item.brandingName || String(item.customizationBrief ?? "").length < 20) throw new Error("White-label programme changed");
       } else {
         let remaining = Number(item.quantity);
         for (const balance of balances.documents) {

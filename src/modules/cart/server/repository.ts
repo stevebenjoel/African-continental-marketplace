@@ -2,19 +2,20 @@ import "server-only";
 import { ID, Query } from "node-appwrite";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
-import { getOfferProgram } from "@/src/modules/catalogue/server/product-programs";
+import { ensureRetailPreorderProgram, getOfferProgram } from "@/src/modules/catalogue/server/product-programs";
 import { preorderIsOpen, type PurchaseType } from "@/src/modules/catalogue/domain/product-program";
 const databaseId = () => env().APPWRITE_DATABASE_ID;
 const db = () => createAppwriteDatabaseClient().databases;
 export async function getCart(userId: string) { const databases = db(); try { const cart = await databases.getDocument({ databaseId: databaseId(), collectionId: "carts", documentId: userId }); const items = await databases.listDocuments({ databaseId: databaseId(), collectionId: "cart_items", queries: [Query.equal("cartId", cart.$id), Query.limit(100)] }); return { cart, items: items.documents }; } catch (error) { if (typeof error === "object" && error && "code" in error && error.code === 404) return { cart: null, items: [] }; throw error; } }
 export async function addToCart(userId: string, offerId: string, requestedQuantity: number, options: { purchaseType?: PurchaseType; brandingName?: string; customizationBrief?: string } = {}) {
   const databases = db(), purchaseType = options.purchaseType ?? "standard";
-  const [offer, program] = await Promise.all([databases.getDocument({ databaseId: databaseId(), collectionId: "seller_offers", documentId: offerId }), getOfferProgram(offerId)]);
+  const [offer, existingProgram] = await Promise.all([databases.getDocument({ databaseId: databaseId(), collectionId: "seller_offers", documentId: offerId }), getOfferProgram(offerId)]);
   if (offer.status !== "approved") throw new Error("Offer unavailable");
   const [product, vendor, balances] = await Promise.all([databases.getDocument({ databaseId: databaseId(), collectionId: "products", documentId: String(offer.productId) }), databases.getDocument({ databaseId: databaseId(), collectionId: "vendors", documentId: String(offer.vendorId) }), databases.listDocuments({ databaseId: databaseId(), collectionId: "inventory_balances", queries: [Query.equal("offerId", offerId), Query.limit(100)] })]);
   if (product.status !== "approved" || !["approved", "active"].includes(String(vendor.status))) throw new Error("Offer unavailable");
   const stock = balances.documents.reduce((sum, item) => sum + Number(item.onHand) - Number(item.reserved) - Number(item.damaged), 0), current = await getCart(userId), existing = current.items.find(item => item.offerId === offerId), quantity = Number(existing?.quantity ?? 0) + requestedQuantity;
-  let minimum = Number(offer.minimumOrderQuantity), available = stock, promisedDispatchAt: string | undefined;
+  let minimum = Number(offer.minimumOrderQuantity), available = stock, promisedDispatchAt: string | undefined, program = existingProgram;
+  if (purchaseType === "preorder" && !program?.preorderEnabled) program = await ensureRetailPreorderProgram({ offerId, vendorId: String(offer.vendorId), productId: product.$id, processingDays: Number(offer.processingDays), ...(offer.maximumOrderQuantity ? { maximumOrderQuantity: Number(offer.maximumOrderQuantity) } : {}), actorUserId: userId });
   if (purchaseType === "preorder") { if (!program || !preorderIsOpen(program)) throw new Error("Pre-order unavailable"); available = Number(program.preorderCapacity) - Number(program.preorderReserved); promisedDispatchAt = String(program.estimatedDispatchAt); }
   if (purchaseType === "white_label") { if (!program?.whiteLabelEnabled || !options.brandingName?.trim() || (options.customizationBrief?.trim().length ?? 0) < 20) throw new Error("White-label requirements incomplete"); minimum = Number(program.whiteLabelMinimumQuantity); available = Number.MAX_SAFE_INTEGER; promisedDispatchAt = new Date(Date.now() + Number(program.whiteLabelLeadDays) * 86400000).toISOString(); }
   if (existing && String(existing.purchaseType ?? "standard") !== purchaseType) throw new Error("Remove the existing offer before choosing another buying programme");

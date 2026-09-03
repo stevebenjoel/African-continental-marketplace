@@ -18,6 +18,14 @@ export async function getOfferProgram(offerId: string) {
   return rows.documents[0] ?? null;
 }
 
+export async function ensureRetailPreorderProgram(input: { offerId: string; vendorId: string; productId: string; processingDays: number; maximumOrderQuantity?: number; actorUserId: string }) {
+  const existing = await getOfferProgram(input.offerId);
+  if (existing?.preorderEnabled) return existing;
+  const now = new Date(), dispatch = new Date(now.getTime() + Math.max(7, input.processingDays) * 86400000), close = new Date(dispatch.getTime() - 86400000);
+  const data = { offerId: input.offerId, vendorId: input.vendorId, productId: input.productId, preorderEnabled: true, preorderOpensAt: now.toISOString(), preorderClosesAt: close.toISOString(), estimatedDispatchAt: dispatch.toISOString(), preorderCapacity: input.maximumOrderQuantity ?? 10000, preorderReserved: Number(existing?.preorderReserved ?? 0), whiteLabelEnabled: Boolean(existing?.whiteLabelEnabled), ...(existing?.whiteLabelMinimumQuantity ? { whiteLabelMinimumQuantity: existing.whiteLabelMinimumQuantity } : {}), ...(existing?.whiteLabelLeadDays ? { whiteLabelLeadDays: existing.whiteLabelLeadDays } : {}), ...(existing?.whiteLabelOptions ? { whiteLabelOptions: existing.whiteLabelOptions } : {}), updatedAt: now.toISOString(), updatedBy: input.actorUserId };
+  return db().upsertDocument({ databaseId: databaseId(), collectionId: "product_programs", documentId: existing?.$id ?? input.offerId, permissions: [], data });
+}
+
 export async function listVendorProgramOffers(vendorId: string) {
   const databases = db();
   const [offers, programs] = await Promise.all([

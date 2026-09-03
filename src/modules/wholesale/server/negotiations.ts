@@ -41,7 +41,7 @@ export async function saveNegotiationSettings(input: { actorUserId: string; vend
   else await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_settings", documentId: ID.unique(), permissions: [], data });
 }
 
-export async function createNegotiation(input: { buyerUserId: string; offerId: string; quantity: number; unitPriceMinor: number; deliveryCountryCode: string; requestedDeliveryAt?: string; message: string }) {
+export async function createNegotiation(input: { buyerUserId: string; offerId: string; quantity: number; unitPriceMinor: number; deliveryCountryCode: string; requestedDeliveryAt?: string; message: string; negotiationType?: "price" | "white_label"; brandingName?: string; customizationBrief?: string }) {
   const database = db(), buyer = await findBusinessBuyer(input.buyerUserId);
   if (!buyer || buyer.status !== "approved") throw new Error("Approved business buyer required");
   const [offer, settingsResult] = await Promise.all([
@@ -55,12 +55,15 @@ export async function createNegotiation(input: { buyerUserId: string; offerId: s
     database.getDocument({ databaseId: databaseId(), collectionId: "vendors", documentId: String(offer.vendorId) })
   ]);
   const regularUnitPriceMinor = Number(offer.wholesalePriceMinor ?? offer.retailPriceMinor);
+  const negotiationType = input.negotiationType ?? "price";
+  if (negotiationType === "white_label" && (input.brandingName?.trim().length ?? 0) < 2) throw new Error("White-label brand is required");
+  if (negotiationType === "white_label" && (input.customizationBrief?.trim().length ?? 0) < 20) throw new Error("White-label brief is required");
   validateNegotiatedPrice({ unitPriceMinor: input.unitPriceMinor, quantity: input.quantity, regularUnitPriceMinor, minimumQuantity: Number(settings.minimumQuantity) });
   const negotiationId = ID.unique(), createdAt = now(), expiresAt = new Date(Date.now() + Number(settings.expiryHours) * 3_600_000).toISOString();
-  await database.createDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: negotiationId, permissions: [], data: { negotiationNumber: `PAC-NEG-${new Date().getUTCFullYear()}-${negotiationId.slice(-10).toUpperCase()}`, buyerUserId: input.buyerUserId, businessBuyerId: buyer.$id, vendorId: offer.vendorId, sellerUserId: vendor.ownerUserId, offerId: offer.$id, productId: product.$id, productName: product.name, regularUnitPriceMinor, currentUnitPriceMinor: input.unitPriceMinor, quantity: input.quantity, currency: offer.currency, deliveryCountryCode: input.deliveryCountryCode.toUpperCase(), ...(input.requestedDeliveryAt ? { requestedDeliveryAt: input.requestedDeliveryAt } : {}), status: "submitted", actionRequiredBy: "seller", expiresAt, createdAt, updatedAt: createdAt } });
+  await database.createDocument({ databaseId: databaseId(), collectionId: "price_negotiations", documentId: negotiationId, permissions: [], data: { negotiationNumber: `PAC-NEG-${new Date().getUTCFullYear()}-${negotiationId.slice(-10).toUpperCase()}`, buyerUserId: input.buyerUserId, businessBuyerId: buyer.$id, vendorId: offer.vendorId, sellerUserId: vendor.ownerUserId, offerId: offer.$id, productId: product.$id, productName: product.name, negotiationType, ...(negotiationType === "white_label" ? { brandingName: input.brandingName!.trim(), customizationBrief: input.customizationBrief!.trim(), productionLeadDays: Number(offer.processingDays) } : {}), regularUnitPriceMinor, currentUnitPriceMinor: input.unitPriceMinor, quantity: input.quantity, currency: offer.currency, deliveryCountryCode: input.deliveryCountryCode.toUpperCase(), ...(input.requestedDeliveryAt ? { requestedDeliveryAt: input.requestedDeliveryAt } : {}), status: "submitted", actionRequiredBy: "seller", expiresAt, createdAt, updatedAt: createdAt } });
   await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_offers", documentId: ID.unique(), permissions: [], data: { negotiationId, sequence: 1, proposedBy: "buyer", actorUserId: input.buyerUserId, unitPriceMinor: input.unitPriceMinor, quantity: input.quantity, currency: offer.currency, message: input.message.trim(), validUntil: expiresAt, createdAt } });
   await database.createDocument({ databaseId: databaseId(), collectionId: "negotiation_events", documentId: ID.unique(), permissions: [], data: { negotiationId, actorUserId: input.buyerUserId, actorRole: "buyer", eventType: "submitted", message: input.message.trim(), occurredAt: createdAt } });
-  await notify(String(vendor.ownerUserId), "New wholesale price request", `${buyer.organizationName} requested a price for ${product.name}.`, `/seller/wholesale/negotiations/${negotiationId}`);
+  await notify(String(vendor.ownerUserId), negotiationType === "white_label" ? "New white-label request" : "New wholesale price request", `${buyer.organizationName} requested ${negotiationType === "white_label" ? "white-label terms" : "a price"} for ${product.name}.`, `/seller/wholesale/negotiations/${negotiationId}`);
   return negotiationId;
 }
 
@@ -110,11 +113,11 @@ export async function addAcceptedNegotiationToCart(userId: string, negotiationId
     database.listDocuments({ databaseId: databaseId(), collectionId: "inventory_balances", queries: [Query.equal("offerId", String(negotiation.offerId)), Query.limit(100)] }),
     database.listDocuments({ databaseId: databaseId(), collectionId: "carts", queries: [Query.equal("userId", userId), Query.limit(1)] })
   ]);
-  const available = balances.documents.reduce((sum, item) => sum + Number(item.onHand) - Number(item.reserved) - Number(item.damaged), 0), quantity = Number(negotiation.quantity);
-  if (offer.status !== "approved" || product.status !== "approved" || available < quantity) throw new Error("Stock unavailable");
+  const available = balances.documents.reduce((sum, item) => sum + Number(item.onHand) - Number(item.reserved) - Number(item.damaged), 0), quantity = Number(negotiation.quantity), whiteLabel = String(negotiation.negotiationType ?? "price") === "white_label";
+  if (offer.status !== "approved" || product.status !== "approved" || (!whiteLabel && available < quantity)) throw new Error("Stock unavailable");
   if (!existingCart.documents[0]) await database.createDocument({ databaseId: databaseId(), collectionId: "carts", documentId: userId, permissions: [], data: { userId, status: "active", updatedAt: now() } });
   const cartItem = await database.listDocuments({ databaseId: databaseId(), collectionId: "cart_items", queries: [Query.equal("cartId", userId), Query.equal("offerId", String(negotiation.offerId)), Query.limit(1)] });
-  const data = { cartId: userId, userId, vendorId: negotiation.vendorId, productId: negotiation.productId, ...(offer.variantId ? { variantId: offer.variantId } : {}), offerId: negotiation.offerId, negotiationId, quantity, unitPriceMinor: negotiation.currentUnitPriceMinor, currency: negotiation.currency, productName: product.name, sellerSku: offer.sellerSku, fulfilmentMethod: offer.fulfilmentMethod, updatedAt: now() };
+  const data = { cartId: userId, userId, vendorId: negotiation.vendorId, productId: negotiation.productId, ...(offer.variantId ? { variantId: offer.variantId } : {}), offerId: negotiation.offerId, negotiationId, purchaseType: whiteLabel ? "white_label" : "standard", ...(whiteLabel ? { brandingName: negotiation.brandingName, customizationBrief: negotiation.customizationBrief, promisedDispatchAt: new Date(Date.now() + Number(negotiation.productionLeadDays ?? offer.processingDays) * 86400000).toISOString() } : {}), quantity, unitPriceMinor: negotiation.currentUnitPriceMinor, currency: negotiation.currency, productName: product.name, sellerSku: offer.sellerSku, fulfilmentMethod: offer.fulfilmentMethod, updatedAt: now() };
   if (cartItem.documents[0]) await database.updateDocument({ databaseId: databaseId(), collectionId: "cart_items", documentId: cartItem.documents[0].$id, data });
   else await database.createDocument({ databaseId: databaseId(), collectionId: "cart_items", documentId: ID.unique(), permissions: [], data });
 }
