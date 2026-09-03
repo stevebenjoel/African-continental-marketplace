@@ -8,6 +8,7 @@ import { validateCoupon } from "@/src/modules/promotions/server/coupons";
 import { isAcceptedNegotiationUsable } from "@/src/modules/wholesale/domain/negotiation";
 import { publishAdminNotificationSafely } from "@/src/modules/admin-notifications/server/publisher";
 import { createOrderItemCommissionAllocation, type CommissionChannel } from "@/src/modules/finance/server/commissions";
+import { preorderIsOpen } from "@/src/modules/catalogue/domain/product-program";
 
 const publicId = (prefix: string) => `PAC-${prefix}-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`;
 
@@ -41,16 +42,26 @@ export async function checkout(userId: string, addressId: string, couponCode = "
         validPrice = item.purchaseOrderId ? validPrice && validNegotiation : validNegotiation;
       }
       if (offer.status !== "approved" || product.status !== "approved" || !validPrice) throw new Error("Cart changed");
-      let remaining = Number(item.quantity);
-      for (const balance of balances.documents) {
-        const take = Math.min(Number(balance.onHand) - Number(balance.reserved) - Number(balance.damaged), remaining);
-        if (take > 0) {
-          await db.incrementDocumentAttribute({ databaseId, collectionId: "inventory_balances", documentId: balance.$id, attribute: "reserved", value: take, max: Number(balance.onHand) - Number(balance.damaged), transactionId: transaction.$id });
-          await db.createDocument({ databaseId, collectionId: "inventory_reservations", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { orderId, vendorId: item.vendorId, offerId: item.offerId, warehouseId: balance.warehouseId, quantity: take, status: "active", expiresAt: new Date(Date.now() + 900000).toISOString(), createdAt: new Date().toISOString() } });
-          remaining -= take;
+      const purchaseType = String(item.purchaseType ?? "standard");
+      if (purchaseType === "preorder") {
+        const program = await db.getDocument({ databaseId, collectionId: "product_programs", documentId: String(item.offerId), transactionId: transaction.$id });
+        if (!preorderIsOpen(program) || String(program.estimatedDispatchAt) !== String(item.promisedDispatchAt)) throw new Error("Pre-order changed");
+        await db.incrementDocumentAttribute({ databaseId, collectionId: "product_programs", documentId: program.$id, attribute: "preorderReserved", value: Number(item.quantity), max: Number(program.preorderCapacity), transactionId: transaction.$id });
+      } else if (purchaseType === "white_label") {
+        const program = await db.getDocument({ databaseId, collectionId: "product_programs", documentId: String(item.offerId), transactionId: transaction.$id });
+        if (!program.whiteLabelEnabled || Number(item.quantity) < Number(program.whiteLabelMinimumQuantity) || !item.brandingName || String(item.customizationBrief ?? "").length < 20) throw new Error("White-label programme changed");
+      } else {
+        let remaining = Number(item.quantity);
+        for (const balance of balances.documents) {
+          const take = Math.min(Number(balance.onHand) - Number(balance.reserved) - Number(balance.damaged), remaining);
+          if (take > 0) {
+            await db.incrementDocumentAttribute({ databaseId, collectionId: "inventory_balances", documentId: balance.$id, attribute: "reserved", value: take, max: Number(balance.onHand) - Number(balance.damaged), transactionId: transaction.$id });
+            await db.createDocument({ databaseId, collectionId: "inventory_reservations", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { orderId, vendorId: item.vendorId, offerId: item.offerId, warehouseId: balance.warehouseId, quantity: take, status: "active", expiresAt: new Date(Date.now() + 900000).toISOString(), createdAt: new Date().toISOString() } });
+            remaining -= take;
+          }
         }
+        if (remaining > 0) throw new Error("Insufficient stock");
       }
-      if (remaining > 0) throw new Error("Insufficient stock");
       verified.push({ item, categoryId: String(product.categoryId) });
     }
     const createdAt = new Date().toISOString(), subtotal = verified.reduce((sum, row) => sum + Number(row.item.unitPriceMinor) * Number(row.item.quantity), 0), promotion = await validateCoupon(db, transaction.$id, userId, couponCode, subtotal), total = subtotal - (promotion?.discountMinor ?? 0);
@@ -62,7 +73,7 @@ export async function checkout(userId: string, addressId: string, couponCode = "
       await db.createDocument({ databaseId, collectionId: "vendor_orders", documentId: vendorOrderId, permissions: [], transactionId: transaction.$id, data: { orderId, vendorId, vendorOrderNumber: publicId("VORD"), currency, subtotalMinor: vendorSubtotal, status: "new", createdAt } });
       for (const { item, categoryId } of rows) {
         const orderItemId = ID.unique(), lineTotalMinor = Number(item.unitPriceMinor) * Number(item.quantity);
-        await db.createDocument({ databaseId, collectionId: "order_items", documentId: orderItemId, permissions: [], transactionId: transaction.$id, data: { orderId, vendorOrderId, vendorId, productId: item.productId, ...(item.variantId ? { variantId: item.variantId } : {}), offerId: item.offerId, ...(item.negotiationId ? { negotiationId: item.negotiationId } : {}), ...(item.purchaseOrderId ? { purchaseOrderId: item.purchaseOrderId } : {}), productName: item.productName, sellerSku: item.sellerSku, quantity: item.quantity, unitPriceMinor: item.unitPriceMinor, lineTotalMinor, currency } });
+        await db.createDocument({ databaseId, collectionId: "order_items", documentId: orderItemId, permissions: [], transactionId: transaction.$id, data: { orderId, vendorOrderId, vendorId, productId: item.productId, ...(item.variantId ? { variantId: item.variantId } : {}), offerId: item.offerId, ...(item.negotiationId ? { negotiationId: item.negotiationId } : {}), ...(item.purchaseOrderId ? { purchaseOrderId: item.purchaseOrderId } : {}), ...(item.purchaseType ? { purchaseType: item.purchaseType } : {}), ...(item.promisedDispatchAt ? { promisedDispatchAt: item.promisedDispatchAt } : {}), ...(item.brandingName ? { brandingName: item.brandingName } : {}), ...(item.customizationBrief ? { customizationBrief: item.customizationBrief } : {}), productName: item.productName, sellerSku: item.sellerSku, quantity: item.quantity, unitPriceMinor: item.unitPriceMinor, lineTotalMinor, currency } });
         const channel: CommissionChannel = vendorId === "pacsm-platform" ? "pacsm_products" : item.negotiationId ? "negotiated_wholesale" : item.purchaseOrderId ? "wholesale" : "retail";
         await createOrderItemCommissionAllocation(db, databaseId, transaction.$id, { orderId, vendorOrderId, orderItemId, vendorId, productId: String(item.productId), categoryId, channel, grossMinor: lineTotalMinor, currency, calculatedAt: createdAt });
       }

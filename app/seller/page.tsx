@@ -14,6 +14,7 @@ const activeModules = [
   { name: "AI HS6", href: "/seller/export-readiness/ai-classification", label: "Generate governed HS suggestions" },
   { name: "Evidence Vault", href: "/seller/export-readiness/evidence", label: "Link documents to products" },
   { name: "Products", href: "/seller/products", label: "Manage catalogue" },
+  { name: "Pre-order & White label", href: "/seller/programs", label: "Configure manufacturer programmes" },
   { name: "Inventory", href: "/seller/inventory", label: "Manage stock" },
   { name: "Orders", href: "/seller/orders", label: "View orders" },
   { name: "Wallet", href: "/seller/wallet", label: "Income and withdrawals" },
