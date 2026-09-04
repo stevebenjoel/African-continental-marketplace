@@ -2,6 +2,7 @@ import "server-only";
 import { ID, Query } from "node-appwrite";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
+import { normalizePhoneToE164 } from "@/src/modules/localization/domain/phone";
 
 const db = () => createAppwriteDatabaseClient().databases;
 const databaseId = () => env().APPWRITE_DATABASE_ID;
@@ -14,7 +15,7 @@ export const listProposals = (requirementId: string) => db().listDocuments({ dat
 export const listAgreements = (offtakerId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "offtake_agreements", queries: [Query.equal("offtakerId", offtakerId), Query.limit(200)] });
 
 export async function applyOfftaker(data: Record<string, string>, userId: string) {
-  return db().createDocument({ databaseId: databaseId(), collectionId: "offtaker_applications", documentId: ID.unique(), permissions: [], data: { ownerUserId: userId, legalName: data.legalName, registrationNumber: data.registrationNumber, ...(data.taxId ? { taxId: data.taxId } : {}), countryCode: data.countryCode.toUpperCase(), address: data.address, industry: data.industry, buyerType: data.buyerType, contactName: data.contactName, contactEmail: data.contactEmail.toLowerCase(), contactPhone: data.contactPhone, productCategories: data.productCategories, expectedVolume: data.expectedVolume, buyingFrequency: data.buyingFrequency, sourcingCountries: data.sourcingCountries, currency: data.currency.toUpperCase(), deliveryLocations: data.deliveryLocations, paymentTerms: data.paymentTerms, status: "submitted", verificationLevel: "registered", submittedAt: now() } });
+  return db().createDocument({ databaseId: databaseId(), collectionId: "offtaker_applications", documentId: ID.unique(), permissions: [], data: { ownerUserId: userId, legalName: data.legalName, registrationNumber: data.registrationNumber, ...(data.taxId ? { taxId: data.taxId } : {}), countryCode: data.countryCode.toUpperCase(), address: data.address, industry: data.industry, buyerType: data.buyerType, contactName: data.contactName, contactEmail: data.contactEmail.toLowerCase(), contactPhone: normalizePhoneToE164(data.contactPhone, data.phoneCountryCode), productCategories: data.productCategories, expectedVolume: data.expectedVolume, buyingFrequency: data.buyingFrequency, sourcingCountries: data.sourcingCountries, currency: data.currency.toUpperCase(), deliveryLocations: data.deliveryLocations, paymentTerms: data.paymentTerms, status: "submitted", verificationLevel: "registered", submittedAt: now() } });
 }
 
 export async function reviewOfftaker(offtakerId: string, action: string, level: string, notes: string, actor: string) {

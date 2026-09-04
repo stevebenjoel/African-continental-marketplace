@@ -5,6 +5,8 @@ import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import {assertSameOrigin, publicAppUrl} from "@/src/modules/auth/server/request-security";
 import { addVendorDocument, createVendorApplication, findVendorByOwner } from "@/src/modules/vendors/server/repository";
 import { env } from "@/src/shared/config/env";
+import { normalizePhoneToE164 } from "@/src/modules/localization/domain/phone";
+import { validCountry } from "@/src/modules/localization/domain/regions";
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 export async function POST(request: Request) {
@@ -13,13 +15,16 @@ export async function POST(request: Request) {
   if (!user) return Response.redirect(publicAppUrl("/login?returnTo=/vendor/register"), 303);
   if (await findVendorByOwner(user.$id)) return Response.redirect(publicAppUrl("/vendor/register"), 303);
   const form = await request.formData();
-  const required = ["fullName", "phone", "countryCode", "legalName", "registrationNumber", "businessType", "vendorType", "address", "operationalAddress", "directors", "beneficialOwners", "bankName", "bankAccountName", "bankAccountNumber", "bankCountryCode", "storeName", "storeSlug", "currency"];
+  const required = ["fullName", "phone", "phoneCountryCode", "countryCode", "legalName", "registrationNumber", "businessType", "vendorType", "address", "operationalAddress", "directors", "beneficialOwners", "bankName", "bankAccountName", "bankAccountNumber", "bankCountryCode", "storeName", "storeSlug", "currency"];
   if (required.some((key) => !text(form, key))) return Response.redirect(publicAppUrl("/vendor/register?error=Complete+all+required+fields"), 303);
   const files = ["registration_certificate", "tax_document", "owner_identity"].map((type) => ({ type, file: form.get(type) }));
   if (files.some(({ file }) => !(file instanceof File) || file.size < 1 || file.size > 20 * 1024 * 1024 || !["application/pdf", "image/jpeg", "image/png"].includes(file.type))) return Response.redirect(publicAppUrl("/vendor/register?error=Upload+valid+PDF,+JPG+or+PNG+documents+under+20MB"), 303);
   try {
     const splitNames = (value: string) => value.split(/\r?\n|,/).map((name) => name.trim()).filter(Boolean).slice(0, 25);
-    const { vendorId } = await createVendorApplication({ userId: user.$id, email: user.email, fullName: text(form, "fullName"), phone: text(form, "phone"), countryCode: text(form, "countryCode").toUpperCase(), legalName: text(form, "legalName"), tradingName: text(form, "tradingName"), registrationNumber: text(form, "registrationNumber"), taxId: text(form, "taxId"), businessType: text(form, "businessType"), vendorType: text(form, "vendorType"), address: text(form, "address"), operationalAddress: text(form, "operationalAddress"), directors: splitNames(text(form, "directors")), beneficialOwners: splitNames(text(form, "beneficialOwners")), bankName: text(form, "bankName"), bankAccountName: text(form, "bankAccountName"), bankAccountNumber: text(form, "bankAccountNumber"), bankCountryCode: text(form, "bankCountryCode").toUpperCase(), swiftCode: text(form, "swiftCode").toUpperCase(), exporterNumber: text(form, "exporterNumber"), storeName: text(form, "storeName"), storeSlug: text(form, "storeSlug").toLowerCase(), currency: text(form, "currency").toUpperCase() });
+    const countryCode = text(form, "countryCode").toUpperCase(), bankCountryCode = text(form, "bankCountryCode").toUpperCase();
+    if (!validCountry(countryCode) || !validCountry(bankCountryCode)) throw new Error("INVALID_COUNTRY");
+    const phone = normalizePhoneToE164(text(form, "phone"), text(form, "phoneCountryCode"));
+    const { vendorId } = await createVendorApplication({ userId: user.$id, email: user.email, fullName: text(form, "fullName"), phone, countryCode, legalName: text(form, "legalName"), tradingName: text(form, "tradingName"), registrationNumber: text(form, "registrationNumber"), taxId: text(form, "taxId"), businessType: text(form, "businessType"), vendorType: text(form, "vendorType"), address: text(form, "address"), operationalAddress: text(form, "operationalAddress"), directors: splitNames(text(form, "directors")), beneficialOwners: splitNames(text(form, "beneficialOwners")), bankName: text(form, "bankName"), bankAccountName: text(form, "bankAccountName"), bankAccountNumber: text(form, "bankAccountNumber"), bankCountryCode, swiftCode: text(form, "swiftCode").toUpperCase(), exporterNumber: text(form, "exporterNumber"), storeName: text(form, "storeName"), storeSlug: text(form, "storeSlug").toLowerCase(), currency: text(form, "currency").toUpperCase() });
     const { storage } = createAppwriteAdminClient("storage");
     for (const item of files as { type: string; file: File }[]) {
       const fileId = ID.unique();
