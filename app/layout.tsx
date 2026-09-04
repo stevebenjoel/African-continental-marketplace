@@ -21,6 +21,7 @@ import "./commerce-module-extras.css";
 import "./cart.css";
 import "./home-lanes.css";
 import "./commerce-home.css";
+import "./vertical-discovery.css";
 import "./company-brands.css";
 import "./region.css";
 import "./help.css";
