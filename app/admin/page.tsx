@@ -7,6 +7,7 @@ const modules = [
   { name: "Product Management", value: "Manage marketplace products", note: "Review live seller listings, approve legacy products, take down, restore or delete", href: "/admin/catalogue" },
   { name: "Customer Support", value: "Live chat & WhatsApp", note: "Manage the separate WhatsApp contact channels shown beside the AI assistant", href: "/admin/support" },
   { name: "Daily Reconciliation", value: "Operations and account control", note: "Orders, payments, fulfilment, transit, complaints and exceptions", href: "/admin/reconciliation" },
+  { name: "Inventory Integrity", value: "Stock counts and variances", note: "Approve physical counts, audit adjustments and protect available stock", href: "/admin/inventory" },
   { name: "Trade Academy", value: "Learning operations", note: "Curriculum, enrolments, progress, assessments, projects and credentials", href: "/admin/academy" },
   { name: "Off-takers", value: "Corporate buyer ecosystem", note: "KYB, requirements, agreements and inspections", href: "/admin/offtakers" },
   { name: "Off-taker Finance", value: "Milestones & disputes", note: "Settlement status and dispute resolution", href: "/admin/offtakers/finance" },

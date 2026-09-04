@@ -4,6 +4,8 @@ import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server
 import { env } from "@/src/shared/config/env";
 import { postPaymentJournal } from "@/src/modules/finance/server/journals";
 import { publishAdminNotificationSafely } from "@/src/modules/admin-notifications/server/publisher";
+import { publishLowStockAlerts } from "@/src/modules/inventory/server/integrity";
+import { reservationsCoverStandardItems } from "@/src/modules/inventory/domain/reservation";
 
 const nextPaymentNumber = () => `PAC-PAY-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`;
 
@@ -15,15 +17,19 @@ export async function captureVerifiedPayment(userId: string, orderId: string, pr
   const existing = await databases.listDocuments({ databaseId, collectionId: "payments", queries: [Query.equal("orderId", orderId), Query.limit(1)] });
   if (existing.documents[0]?.status === "captured") return { orderId, paymentId: existing.documents[0].$id };
   if (String(order.status) !== "pending_payment") throw new Error("Order is not payable");
+  if (Date.now() - new Date(String(order.createdAt)).getTime() >= 900_000) throw new Error("Order reservation expired");
 
   const transaction = await databases.createTransaction({ ttl: 120 });
+  const affectedBalanceIds: string[] = [];
   try {
-    const reservations = await databases.listDocuments({ databaseId, collectionId: "inventory_reservations", queries: [Query.equal("orderId", orderId), Query.equal("status", "active"), Query.limit(500)], transactionId: transaction.$id });
-    if (!reservations.documents.length) throw new Error("No active inventory reservations");
+    const [reservations,items] = await Promise.all([databases.listDocuments({ databaseId, collectionId: "inventory_reservations", queries: [Query.equal("orderId", orderId), Query.equal("status", "active"), Query.limit(500)], transactionId: transaction.$id }),databases.listDocuments({databaseId,collectionId:"order_items",queries:[Query.equal("orderId",orderId),Query.limit(500)],transactionId:transaction.$id})]);
+    const reservedByOffer=new Map<string,number>();for(const reservation of reservations.documents)reservedByOffer.set(String(reservation.offerId),(reservedByOffer.get(String(reservation.offerId))??0)+Number(reservation.quantity));
+    if(!reservationsCoverStandardItems(items.documents.map(item=>({offerId:String(item.offerId),quantity:Number(item.quantity),purchaseType:String(item.purchaseType??"standard")})),reservedByOffer))throw new Error("No active inventory reservation for a standard item");
     for (const reservation of reservations.documents) {
       const balances = await databases.listDocuments({ databaseId, collectionId: "inventory_balances", queries: [Query.equal("offerId", String(reservation.offerId)), Query.equal("warehouseId", String(reservation.warehouseId)), Query.limit(1)], transactionId: transaction.$id });
       const balance = balances.documents[0];
       if (!balance) throw new Error("Reserved stock balance no longer exists");
+      affectedBalanceIds.push(balance.$id);
       const quantity = Number(reservation.quantity);
       await databases.decrementDocumentAttribute({ databaseId, collectionId: "inventory_balances", documentId: balance.$id, attribute: "onHand", value: quantity, min: 0, transactionId: transaction.$id });
       await databases.decrementDocumentAttribute({ databaseId, collectionId: "inventory_balances", documentId: balance.$id, attribute: "reserved", value: quantity, min: 0, transactionId: transaction.$id });
@@ -36,6 +42,7 @@ export async function captureVerifiedPayment(userId: string, orderId: string, pr
     await databases.updateDocument({ databaseId, collectionId: "orders", documentId: orderId, data: { status: "paid" }, transactionId: transaction.$id });
     await databases.createDocument({ databaseId, collectionId: "order_events", documentId: ID.unique(), permissions: [], transactionId: transaction.$id, data: { orderId, eventType: "payment_confirmed", actorUserId: userId, metadata: JSON.stringify({ paymentId: payment.$id, provider, providerReference }), occurredAt: capturedAt } });
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
+    await publishLowStockAlerts(affectedBalanceIds);
     await publishAdminNotificationSafely({eventType:"payment_captured",priority:"action",title:"Payment captured — fulfilment required",body:`${order.currency} ${(Number(order.totalMinor)/100).toLocaleString()} was captured for order ${orderId}.`,entityType:"order",entityId:orderId,href:`/admin/orders?orderId=${orderId}`,roles:["finance_officer","order_fulfilment_manager"]});
     return { orderId, paymentId: payment.$id };
   } catch (error) {

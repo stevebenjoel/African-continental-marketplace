@@ -1,0 +1,2 @@
+"use client";
+export function InventoryFilter(){function filter(value:string){const query=value.trim().toLowerCase();document.querySelectorAll<HTMLElement>(".review-table .review-row:not(.review-head)").forEach(row=>{row.hidden=Boolean(query)&&!row.innerText.toLowerCase().includes(query)})}return <label className="inventory-search">Filter stock and ledger<input type="search" placeholder="SKU, offer, warehouse or movement" onChange={event=>filter(event.currentTarget.value)}/></label>}

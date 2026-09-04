@@ -1,0 +1,2 @@
+import Link from"next/link";import{InventoryFilter}from"./inventory-filter";
+export default function InventoryLayout({children}:{children:React.ReactNode}){return <><aside style={{position:"fixed",right:24,bottom:82,zIndex:30,display:"grid",gap:8,background:"white",padding:10,borderRadius:12,boxShadow:"0 8px 30px #0002"}}><InventoryFilter/><Link className="home-return-link" href="/api/seller/inventory/export">Download stock CSV</Link></aside>{children}</>}
