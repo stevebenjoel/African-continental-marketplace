@@ -1,0 +1,6 @@
+import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
+import { findVendorByOwner } from "@/src/modules/vendors/server/repository";
+import { buildBulkStockTemplate } from "@/src/modules/inventory/domain/bulk-stock";
+import { listOffers, listProductsForOffers } from "@/src/modules/inventory/server/repository";
+
+export async function GET() { const user = await getCurrentAppwriteUser(); if (!user) return new Response("Unauthorized", { status: 401 }); const vendor = await findVendorByOwner(user.$id); if (!vendor || !["approved", "active"].includes(String(vendor.status))) return new Response("Forbidden", { status: 403 }); const offerResult = await listOffers(vendor.$id), offers = offerResult.documents.filter(offer => offer.status === "approved"), products = await listProductsForOffers(offers.map(offer => String(offer.productId))), names = new Map(products.documents.map(product => [product.$id, String(product.name)])); return new Response(buildBulkStockTemplate(offers.map(offer => ({ name: names.get(String(offer.productId)) ?? String(offer.sellerSku), sellerSku: String(offer.sellerSku) }))), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=pac-sm-stock-template.csv", "Cache-Control": "private, no-store" } }); }

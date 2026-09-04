@@ -12,6 +12,7 @@ import "./product-intents.css";
 import "./catalogue.css";
 import "./featured-products.css";
 import "./inventory.css";
+import "./simple-inventory.css";
 import "./marketplace.css";
 import "./wholesale.css";
 import "./retail-marketplace.css";
