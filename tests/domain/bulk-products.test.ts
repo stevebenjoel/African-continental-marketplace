@@ -8,7 +8,10 @@ test("demo bulk CSV follows the accepted schema and produces two products", () =
   assert.equal(result.errors.length, 0);
   assert.equal(result.products.length, 2);
   assert.equal(result.products[0].retailPriceMinor, 650000);
+  assert.deepEqual(result.products[0].imageUrls,["https://example.com/images/shea-front.jpg","https://example.com/images/shea-back.jpg"]);
 });
+
+test("bulk CSV rejects unsafe image URLs before creating products",()=>{const csv=buildBulkProductTemplate().replace("https://example.com/images/shea-front.jpg","http://127.0.0.1/private.jpg"),result=parseBulkProductsCsv(csv,new Set(["health","electronics"]));assert.equal(result.products.length,0);assert.ok(result.errors.some(error=>error.row===2&&error.field==="image_url_1"))});
 
 test("bulk CSV reports row-specific validation errors without returning products", () => {
   const csv = buildBulkProductTemplate().replace("example-shea-body-butter", "Bad Slug").replace("health", "missing-category"), result = parseBulkProductsCsv(csv, new Set(["health", "electronics"]));

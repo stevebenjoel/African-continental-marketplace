@@ -1,7 +1,7 @@
 import { ID } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
 import { createAppwriteAdminClient, createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
-import { PRODUCT_MEDIA_LIMIT, PRODUCT_MEDIA_MAX_BYTES, PRODUCT_MEDIA_TYPES, normalizeProductImageAlt, validProductImageSignature } from "@/src/modules/catalogue/domain/product-media";
+import { normalizeProductImageAlt, validateProductImageBatch, validProductImageSignature } from "@/src/modules/catalogue/domain/product-media";
 import { createProductMedia, listProductMedia } from "@/src/modules/catalogue/server/media";
 import { getCurrentAppwriteUser } from "@/src/modules/auth/server/session";
 import { assertSameOrigin, publicAppUrl } from "@/src/modules/auth/server/request-security";
@@ -22,12 +22,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     const form = await request.formData(), altText = normalizeProductImageAlt(String(form.get("altText") ?? product.name));
     const files = form.getAll("images").filter((item): item is File => item instanceof File && item.size > 0);
     const existing = await listProductMedia(productId);
-    if (!files.length || existing.total + files.length > PRODUCT_MEDIA_LIMIT) throw new Error(`A product can have up to ${PRODUCT_MEDIA_LIMIT} images`);
-    const storage = createAppwriteAdminClient("storage").storage;
-    for (const [index, file] of files.entries()) {
-      if (file.size > PRODUCT_MEDIA_MAX_BYTES || !(PRODUCT_MEDIA_TYPES as readonly string[]).includes(file.type)) throw new Error("Unsupported product image");
+    validateProductImageBatch(existing.total, files);
+    const validatedImages = await Promise.all(files.map(async file => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (!validProductImageSignature(bytes, file.type)) throw new Error("Image content does not match its type");
+      return { file, bytes };
+    }));
+    const storage = createAppwriteAdminClient("storage").storage;
+    for (const [index, { file, bytes }] of validatedImages.entries()) {
       const fileId = ID.unique();
       await storage.createFile({ bucketId: env().APPWRITE_PRODUCT_MEDIA_BUCKET_ID, fileId, file: InputFile.fromBuffer(Buffer.from(bytes), file.name), permissions: [] });
       try { await createProductMedia({ productId, vendorId: vendor.$id, actorUserId: user.$id, fileId, filename: file.name, mimeType: file.type, sizeBytes: file.size, altText: files.length > 1 ? `${altText} — image ${existing.total + index + 1}` : altText, sortOrder: existing.total + index, makePrimary: existing.total === 0 && index === 0 }); }

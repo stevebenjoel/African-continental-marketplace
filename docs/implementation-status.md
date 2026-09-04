@@ -1,62 +1,55 @@
-# PAC-SM Implementation Status
+# PAC-SM implementation status
 
-> Backend decision (15 August 2026): Appwrite is the exclusive backend. The `pacsm-core` database is provisioned, vendor/KYB/KYC workflows are connected, and PostgreSQL is no longer an active dependency or deployment requirement.
+> Updated 3 September 2026. Appwrite is the exclusive PAC-SM backend. PostgreSQL, Redis and an external search service are not active application or deployment dependencies.
 
 ## Current increment
 
-**Phase 1A — Identity and authentication**
+**Pilot stabilization and catalogue quality**
 
-### Completed
+The application is a Next.js 16 App Router deployment backed by the self-hosted Appwrite project and the `pacsm-core` database. Work in this increment should harden the existing pilot workflows and data quality without introducing a second persistence architecture.
 
-- Self-hosted Appwrite endpoint and project integration
-- External provisioning-key storage and runtime secret loading
-- Secured product-media and private-KYC storage buckets
-- Server-mediated account registration
-- Server-mediated email/password login
-- HTTP-only, SameSite session cookie with production HTTPS enforcement
-- Authenticated account resolution on the server
-- Protected `/account` route
-- Appwrite session revocation and local cookie removal on logout
-- Same-origin validation for authentication mutations
-- Open-redirect protection for post-login navigation
-- Strong registration-password validation and normalized email addresses
-- Generic authentication errors that do not disclose account existence
-- Live temporary-account registration/session test with cleanup
-- Email-verification request and completion flows
-- Password-recovery request and completion flows
-- Account-enumeration-resistant recovery response
-- Strong-password enforcement during recovery
-- Appwrite-backed Super Administrator bootstrap
-- Exact `superadmin` label authorization enforced on the server
-- Protected `/admin` operational dashboard
-- Live privileged login and Admin Centre access test
+### Current platform baseline
 
-### Validation
+- Server-mediated Appwrite authentication, verification, recovery, Google OAuth and protected account lifecycle controls
+- Customer marketplace, regional preferences, cart, checkout, payment adapters, orders, returns, disputes, reviews, wishlist and messaging
+- Approved-seller onboarding, storefronts, catalogue publication, product media, inventory, orders, wallet, analytics and integrations
+- Retail, wholesale, RFQ, pre-order, white-label and institutional off-taker workflows
+- Carrier, warehouse, tracking, trade, standards, export-readiness and Academy operations
+- Role-scoped administration, catalogue moderation, notifications, reconciliation, commissions and audit records
+- Appwrite private buckets for product media, storefront branding, KYC/KYB and operational evidence
+- Public FAQ and Documentation maintained with user-facing behavior changes
 
-- Appwrite administrative connection: passing
-- Appwrite registration and protected-session flow: passing
-- TypeScript: passing
-- ESLint: passing
-- Domain tests: passing
-- Production build: passing
-- Super Admin access test: passing
+### Catalogue and media controls
 
-### External configuration still required
+- Approved sellers can publish products and attach up to eight JPEG, PNG or WebP images of up to 8 MB each.
+- Product-image batches are validated completely before the first Appwrite write. An invalid count, size, MIME type or file signature rejects the selected batch before any of its files are published.
+- Original files remain in private Appwrite storage and are delivered through the controlled media route.
+- Approved images are ordered with the selected primary image first and are shared by retail, wholesale and storefront presentation.
+- Super Admin retains post-publication product and media moderation, takedown, restoration and deletion controls.
 
-- Appwrite SMTP must be configured to deliver verification and recovery messages.
-- `http://localhost:3000` must be registered as a development Web platform/callback host in Appwrite.
-- The future Coolify production domain must be registered in Appwrite and used as `APP_BASE_URL`.
+## Validation baseline
 
-## Next increment
+At commit `d8c7259`, before the current increment:
 
-**PostgreSQL connection, migrations, identity projection, RBAC, and tenant authorization**
+- Git `main` was clean and synchronized with `origin/main`.
+- All 67 domain tests passed.
+- TypeScript passed.
 
-The schema and initial migration already exist. Execution requires a reachable PostgreSQL `DATABASE_URL`. Local Docker/PostgreSQL is not installed in the current environment, and the configured URL is still a placeholder. The database URL must be supplied as a local ignored secret and later as a locked Coolify runtime variable.
+Every pilot release must also pass the complete gate in [PILOT-READINESS.md](./PILOT-READINESS.md), including lint, production build, browser acceptance, backup confirmation and named rollback ownership.
 
-After connectivity is available, the next work is:
+## External activation still required
 
-1. Apply and verify the initial migration.
-2. Provision baseline roles and permissions.
-3. Project authenticated Appwrite identities into `users` idempotently.
-4. Implement business memberships and tenant-scoped authorization policies.
-5. Add negative tests proving one vendor cannot access another vendor's resources.
+- Keep the production and local Web platforms registered in Appwrite.
+- Configure and verify Appwrite SMTP for verification and password-recovery delivery.
+- Configure Google OAuth in Appwrite using the provider callback displayed by Appwrite.
+- Keep the limited runtime Appwrite key in the deployment secret store and the provisioning key outside the application runtime.
+- Activate live payment or banking providers only after their credentials, callbacks, webhook verification and operational acceptance are complete.
+- Confirm Appwrite database and storage backups before a pilot release.
+
+## Next stabilization work
+
+1. Run the full release gate against the configured Appwrite environment.
+2. Verify registration, verification, recovery, checkout, payment retry and fulfilment end to end on the canonical production host.
+3. Audit pilot catalogue records for missing, low-quality or unlicensed media and incomplete product attributes.
+4. Exercise concurrent inventory, programme-capacity and payment idempotency paths with production-like data.
+5. Record the deployable image tag, rollback owner and backup evidence for the pilot release.

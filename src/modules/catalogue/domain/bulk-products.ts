@@ -1,4 +1,5 @@
-export const BULK_PRODUCT_COLUMNS = ["name","slug","description","category_id","brand_name","manufacturer","country_of_origin","model","gtin","specifications","variant_name","sku","variant_attributes","retail_price","wholesale_price","currency","minimum_order_quantity","fulfilment_method","processing_days"] as const;
+export const BULK_IMAGE_COLUMNS = ["image_url_1","image_url_2","image_url_3","image_url_4","image_url_5","image_url_6","image_url_7","image_url_8"] as const;
+export const BULK_PRODUCT_COLUMNS = ["name","slug","description","category_id","brand_name","manufacturer","country_of_origin","model","gtin","specifications","variant_name","sku","variant_attributes","retail_price","wholesale_price","currency","minimum_order_quantity","fulfilment_method","processing_days",...BULK_IMAGE_COLUMNS] as const;
 export const BULK_PRODUCT_MAX_ROWS = 50;
 export const BULK_PRODUCT_MAX_BYTES = 1024 * 1024;
 
@@ -6,7 +7,7 @@ export type BulkProductInput = {
   name: string; slug: string; description: string; categoryId: string; brandName: string; manufacturer: string;
   countryOfOrigin: string; model: string; gtin: string; specifications: string; variantName: string; sku: string;
   variantAttributes: string; retailPriceMinor: number; wholesalePriceMinor?: number; currency: string;
-  minimumOrderQuantity: number; fulfilmentMethod: string; processingDays: number;
+  minimumOrderQuantity: number; fulfilmentMethod: string; processingDays: number; imageUrls:string[];
 };
 export type BulkProductError = { row: number; field: string; message: string };
 
@@ -59,16 +60,19 @@ export function parseBulkProductsCsv(source: string, validCategoryIds: ReadonlyS
     if (!value("variant_name")) add("variant_name", "Variant name is required");
     if (!value("variant_attributes")) add("variant_attributes", "Variant attributes are required");
     if (!value("specifications")) add("specifications", "Specifications are required");
-    products.push({ name, slug, description, categoryId, brandName: value("brand_name"), manufacturer: value("manufacturer"), countryOfOrigin, model: value("model"), gtin: value("gtin"), specifications: value("specifications"), variantName: value("variant_name"), sku, variantAttributes: value("variant_attributes"), retailPriceMinor, ...(wholesalePriceMinor ? { wholesalePriceMinor } : {}), currency, minimumOrderQuantity, fulfilmentMethod, processingDays });
+    const imageEntries=BULK_IMAGE_COLUMNS.map(column=>({column,url:value(column)})).filter(item=>item.url),imageUrls=imageEntries.map(item=>item.url);
+    for(const image of imageEntries){try{const parsed=new URL(image.url);if(parsed.protocol!=="https:"||parsed.username||parsed.password)throw new Error()}catch{add(image.column,"Use a complete public HTTPS image URL")}}
+    products.push({ name, slug, description, categoryId, brandName: value("brand_name"), manufacturer: value("manufacturer"), countryOfOrigin, model: value("model"), gtin: value("gtin"), specifications: value("specifications"), variantName: value("variant_name"), sku, variantAttributes: value("variant_attributes"), retailPriceMinor, ...(wholesalePriceMinor ? { wholesalePriceMinor } : {}), currency, minimumOrderQuantity, fulfilmentMethod, processingDays,imageUrls });
   }
+  if(products.reduce((sum,product)=>sum+product.imageUrls.length,0)>100)errors.push({row:1,field:"image_urls",message:"One CSV can import at most 100 remote images"});
   return { products: errors.length ? [] : products, errors };
 }
 
 const csvCell = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
 export function buildBulkProductTemplate(): string {
   const rows = [
-    ["Example Shea Body Butter","example-shea-body-butter","Natural shea body butter supplied by a verified PAC-SM seller.","health","Example Brand","Example Manufacturer","GH","SB-250","","Weight: 250 g | Ingredients: Shea butter","250 g jar","DEMO-SHEA-250","Size: 250 g; Pack: Jar","6500","6000","NGN","1","vendor","2"],
-    ["Example Solar Home Kit","example-solar-home-kit","Compact solar home kit for lighting and everyday device charging.","electronics","Example Energy","Example Energy Limited","KE","SHK-100","","Panel: 100 W | Warranty: Enter verified warranty","Standard kit","DEMO-SOLAR-100","Colour: Black; Package: Complete kit","185000","175000","NGN","1","pacsm_logistics","4"]
+    ["Example Shea Body Butter","example-shea-body-butter","Natural shea body butter supplied by a verified PAC-SM seller.","health","Example Brand","Example Manufacturer","GH","SB-250","","Weight: 250 g | Ingredients: Shea butter","250 g jar","DEMO-SHEA-250","Size: 250 g; Pack: Jar","6500","6000","NGN","1","vendor","2","https://example.com/images/shea-front.jpg","https://example.com/images/shea-back.jpg","","","","","",""],
+    ["Example Solar Home Kit","example-solar-home-kit","Compact solar home kit for lighting and everyday device charging.","electronics","Example Energy","Example Energy Limited","KE","SHK-100","","Panel: 100 W | Warranty: Enter verified warranty","Standard kit","DEMO-SOLAR-100","Colour: Black; Package: Complete kit","185000","175000","NGN","1","pacsm_logistics","4","https://example.com/images/solar-kit.jpg","","","","","","",""]
   ];
   return [BULK_PRODUCT_COLUMNS.join(","), ...rows.map(row => row.map(csvCell).join(","))].join("\r\n") + "\r\n";
 }

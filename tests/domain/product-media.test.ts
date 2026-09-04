@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { normalizeProductImageAlt, validProductImageSignature } from "../../src/modules/catalogue/domain/product-media.ts";
+import { PRODUCT_MEDIA_MAX_BYTES, normalizeProductImageAlt, validateProductImageBatch, validProductImageSignature } from "../../src/modules/catalogue/domain/product-media.ts";
 
 describe("product media validation", () => {
   it("recognizes supported image signatures", () => {
@@ -13,5 +13,16 @@ describe("product media validation", () => {
   it("normalizes useful accessible descriptions", () => {
     assert.equal(normalizeProductImageAlt("  Organic   cocoa powder pack  "), "Organic cocoa powder pack");
     assert.throws(() => normalizeProductImageAlt("x"));
+  });
+
+  it("validates an entire upload batch before publication", () => {
+    assert.doesNotThrow(() => validateProductImageBatch(6, [
+      { size: 1024, type: "image/jpeg" },
+      { size: 2048, type: "image/webp" },
+    ]));
+    assert.throws(() => validateProductImageBatch(8, [{ size: 1024, type: "image/png" }]), /up to 8/);
+    assert.throws(() => validateProductImageBatch(0, [{ size: PRODUCT_MEDIA_MAX_BYTES + 1, type: "image/png" }]), /size/);
+    assert.throws(() => validateProductImageBatch(0, [{ size: 1024, type: "image/gif" }]), /type/);
+    assert.throws(() => validateProductImageBatch(0, []), /at least one/);
   });
 });
