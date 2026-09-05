@@ -40,6 +40,10 @@ const secret = (key: string, size: number): Attribute => ({ key, type: "string",
 const idx = (key: string, type: "key" | "unique", attributes: string[]): Index => ({ key, type, attributes });
 
 const collections: { id: string; name: string; attributes: Attribute[]; indexes: Index[] }[] = [
+  { id: "global_suppliers", name: "Global Commerce Suppliers", attributes: [s("name",180,true),s("slug",100,true),s("provider",40,true),s("supplierType",40,true),s("integrationType",40,true),s("status",32,true),s("ownerVendorId",36,true),s("ownerStoreId",36,true),s("countryCode",2,true),{...s("supportedCountries",2),array:true},s("defaultCurrency",3,true),{...s("fulfilmentModes",40,true),array:true},s("apiBaseUrl",1000),s("connectionStatus",32,true),dt("lastConnectionTestAt"),dt("lastSuccessfulSyncAt"),dt("lastFailedSyncAt"),i("priority",true),i("reliabilityScore",true),s("createdBy",36,true),dt("createdAt",true),dt("updatedAt",true)], indexes:[idx("global_supplier_slug_unique","unique",["slug"]),idx("global_supplier_provider_idx","key",["provider"]),idx("global_supplier_status_idx","key",["status"]),idx("global_supplier_owner_idx","key",["ownerVendorId"]),idx("global_supplier_connection_idx","key",["connectionStatus"])] },
+  { id: "supplier_credentials", name: "Encrypted Supplier Credentials", attributes: [s("supplierId",36,true),secret("encryptedValue",10000),s("maskedValue",120,true),i("encryptionVersion",true),dt("expiresAt"),s("updatedBy",36,true),dt("updatedAt",true)], indexes:[idx("supplier_credential_unique","unique",["supplierId"])] },
+  { id: "supplier_connections", name: "Supplier Connection History", attributes: [s("supplierId",36,true),s("provider",40,true),s("status",32,true),s("externalAccountId",120),s("message",500,true),s("requestId",100),dt("tokenExpiresAt"),dt("testedAt",true),s("testedBy",36,true)], indexes:[idx("supplier_connection_idx","key",["supplierId","testedAt"]),idx("supplier_connection_status_idx","key",["status"])] },
+  { id: "global_feature_flags", name: "Global Commerce Feature Flags", attributes: [s("key",80,true),b("enabled",true),s("mode",40,true),s("updatedBy",36,true),dt("updatedAt",true)], indexes:[idx("global_flag_key_unique","unique",["key"])] },
   { id: "support_channels", name: "Customer Support Channels", attributes: [s("label",120,true),s("whatsappNumber",24,true),s("prefilledMessage",500),s("status",24,true),i("sortOrder",true),s("createdBy",36,true),dt("createdAt",true),dt("updatedAt",true)], indexes: [idx("support_number_unique","unique",["whatsappNumber"]),idx("support_status_order_idx","key",["status","sortOrder"])] },
   { id: "profiles", name: "User Profiles", attributes: [s("userId", 36, true), s("email", 320, true), s("fullName", 180, true), s("phone", 40), s("countryCode", 2, true)], indexes: [idx("user_unique", "unique", ["userId"]), idx("email_idx", "key", ["email"])] },
   { id: "businesses", name: "Businesses", attributes: [s("ownerUserId", 36, true), s("legalName", 180, true), s("tradingName", 180), s("registrationNumber", 100, true), s("taxId", 100), s("countryCode", 2, true), s("businessType", 60, true), s("address", 1000, true), s("status", 32, true)], indexes: [idx("business_owner_idx", "key", ["ownerUserId"]), idx("registration_idx", "key", ["registrationNumber"])] },
@@ -183,7 +187,10 @@ try {
 }
 
 const collectionPrefix = process.env.APPWRITE_COLLECTION_PREFIX?.trim();
-for (const collection of collections.filter((item) => !collectionPrefix || item.id.startsWith(collectionPrefix))) {
+const selectedCollections = collectionPrefix === "global_"
+  ? new Set(["global_suppliers", "supplier_credentials", "supplier_connections", "global_feature_flags"])
+  : undefined;
+for (const collection of collections.filter((item) => !collectionPrefix || selectedCollections?.has(item.id) || item.id.startsWith(collectionPrefix))) {
   let live;
   try {
     live = await databases.getCollection({ databaseId, collectionId: collection.id });
@@ -214,6 +221,12 @@ for (const collection of collections.filter((item) => !collectionPrefix || item.
     await databases.createIndex({ databaseId, collectionId: collection.id, key: index.key, type: index.type === "unique" ? IndexType.Unique : IndexType.Key, attributes: index.attributes });
     process.stdout.write(`created ${collection.id}.${index.key}\n`);
   }
+}
+
+if (!collectionPrefix || collectionPrefix.startsWith("global_")) {
+  const now = new Date().toISOString();
+  for (const flag of ["globalCommerceEnabled","cjIntegrationEnabled","globalCheckoutEnabled","automaticSupplierOrdersEnabled","globalWholesaleEnabled","globalRfqEnabled"]) await databases.upsertDocument({ databaseId, collectionId: "global_feature_flags", documentId: flag, permissions: [], data: { key: flag, enabled: ["globalCommerceEnabled","cjIntegrationEnabled"].includes(flag), mode: flag === "globalCheckoutEnabled" ? "limited_pilot" : flag === "automaticSupplierOrdersEnabled" ? "manual_approval" : "configured", updatedBy: "system", updatedAt: now } });
+  process.stdout.write("seeded Global Commerce feature flags\n");
 }
 
 if(!collectionPrefix||collectionPrefix.startsWith("academy_")){

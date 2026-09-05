@@ -1,0 +1,10 @@
+export const SUPPLIER_TYPES = ["dropshipping", "manufacturer", "wholesaler", "distributor", "aggregator", "local_supplier"] as const;
+export const INTEGRATION_TYPES = ["api", "csv", "xml", "json_feed", "sftp", "manual", "aggregator"] as const;
+export const FULFILMENT_TYPES = ["pacsm_stock", "local_supplier", "global_direct", "global_wholesale", "global_sourcing", "made_to_order", "rfq_only"] as const;
+export type SupplierType = typeof SUPPLIER_TYPES[number];
+export type IntegrationType = typeof INTEGRATION_TYPES[number];
+export type FulfilmentType = typeof FULFILMENT_TYPES[number];
+export type SupplierConnectionStatus = "not_configured" | "testing" | "connected" | "error" | "disabled";
+export const GLOBAL_COMMERCE_FLAGS = ["globalCommerceEnabled", "cjIntegrationEnabled", "globalCheckoutEnabled", "automaticSupplierOrdersEnabled", "globalWholesaleEnabled", "globalRfqEnabled"] as const;
+export type GlobalCommerceFlag = typeof GLOBAL_COMMERCE_FLAGS[number];
+export const safeSupplierSlug = (value: string) => { const slug = value.trim().toLowerCase(); if (!/^[a-z0-9][a-z0-9-]{2,99}$/.test(slug)) throw new Error("Invalid supplier slug"); return slug; };

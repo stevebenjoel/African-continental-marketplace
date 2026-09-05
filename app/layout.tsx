@@ -3,6 +3,7 @@ import "./globals.css";
 import "./auth.css";
 import "./auth-extras.css";
 import "./admin.css";
+import "./global-commerce-admin.css";
 import "./vendor.css";
 import "./seller.css";
 import "./bulk-products.css";

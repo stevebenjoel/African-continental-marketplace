@@ -1,0 +1,5 @@
+import { requireSuperAdmin } from "@/src/modules/authorization/server/require-super-admin";
+import { assertSameOrigin, publicAppUrl } from "@/src/modules/auth/server/request-security";
+import { createGlobalSupplier } from "@/src/modules/global-commerce/server/repository";
+
+export async function POST(request: Request) { try { assertSameOrigin(request); } catch { return new Response("Forbidden", { status: 403 }); } const admin = await requireSuperAdmin(), form = await request.formData(); try { const supplierId = await createGlobalSupplier({ name: String(form.get("name") ?? ""), slug: String(form.get("slug") ?? ""), provider: "cj", apiKey: String(form.get("apiKey") ?? ""), countryCode: String(form.get("countryCode") ?? "").toUpperCase(), defaultCurrency: String(form.get("defaultCurrency") ?? "").toUpperCase(), actorUserId: admin.$id }); return Response.redirect(publicAppUrl(`/admin/global-commerce?created=${supplierId}`), 303); } catch (error) { console.error("Global supplier creation failed", error); return Response.redirect(publicAppUrl("/admin/global-commerce?error=create"), 303); } }

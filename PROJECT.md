@@ -182,4 +182,8 @@ The application framework now includes retail, wholesale, seller onboarding, KYC
 
 **Current release gate:** TypeScript, ESLint, domain tests, production build and local desktop/mobile Playwright acceptance tests must pass before a pilot release. PAC-SM currently uses the one provided Appwrite backend; no staging environment has been created.
 
-**Next recommended action:** Activate Appwrite SMTP and Google OAuth on the configured backend, execute the authentication acceptance checklist in `docs/PILOT-READINESS.md`, then begin the product-media and catalogue-quality stage. A separate staging environment remains an optional future risk-control decision and is not assumed to exist.
+## Global Supplier Gateway
+
+Phase 1 establishes the provider-neutral global supplier control plane with CJdropshipping as the first connector. The permanent commercial rule is that every CJ product and every product from future global suppliers is controlled, sold and accounted for by Diplomats Stores; suppliers remain fulfilment sources and cannot become the marketplace owner of those listings. Appwrite collections `global_suppliers`, `supplier_credentials`, `supplier_connections` and `global_feature_flags` are provisioned in `pacsm-core`. Credential creation and authentication remain Super Admin-only, while scoped global-commerce roles provide operational visibility. Product discovery, import, pricing, synchronization, checkout and supplier order submission remain gated for subsequent phases.
+
+**Next recommended action:** Configure a locked `SUPPLIER_CREDENTIAL_ENCRYPTION_KEY` in Coolify and the local server environment, add the real CJ API key through Admin → Global Commerce, and pass the live connection test before beginning Phase 2 product discovery and controlled import. A separate staging environment remains an optional future risk-control decision and is not assumed to exist.
