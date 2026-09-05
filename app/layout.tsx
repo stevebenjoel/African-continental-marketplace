@@ -45,6 +45,10 @@ import SupportHub from "@/app/components/support-hub";
 import "./support.css";
 import "./account-lifecycle.css";
 import "./admin-home-priority.css";
+import "./cookie-consent.css";
+import CookieConsentCentre from "@/app/components/cookie-consent-centre";
+import { cookies } from "next/headers";
+import { COOKIE_CONSENT_NAME } from "@/src/modules/privacy/domain/cookie-consent";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3000"),
@@ -62,6 +66,6 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [language,user] = await Promise.all([getInterfaceLanguage(),getCurrentAppwriteUser()]);
-  return <html lang={language} dir={language === "ar" ? "rtl" : "ltr"}><body suppressHydrationWarning><GlobalRegionBar />{children}{user&&hasAdministrativeAccess(user.labels)&&<AdminNotificationBell/>}<SupportHub/><GlobalProductUploadLink /><GlobalHomeLink /></body></html>;
+  const [language,user,cookieStore] = await Promise.all([getInterfaceLanguage(),getCurrentAppwriteUser(),cookies()]);
+  return <html lang={language} dir={language === "ar" ? "rtl" : "ltr"}><body suppressHydrationWarning><GlobalRegionBar />{children}{user&&hasAdministrativeAccess(user.labels)&&<AdminNotificationBell/>}<SupportHub/><GlobalProductUploadLink /><GlobalHomeLink /><CookieConsentCentre initialValue={cookieStore.get(COOKIE_CONSENT_NAME)?.value}/></body></html>;
 }

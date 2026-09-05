@@ -1,0 +1,3 @@
+import assert from"node:assert/strict";import test from"node:test";import{newCookieConsent,parseCookieConsent,serializeCookieConsent}from"../../src/modules/privacy/domain/cookie-consent.ts";
+test("cookie consent preserves explicit category choices",()=>{const consent=newCookieConsent({preferences:true,analytics:false,advertising:false},"2026-09-06T10:00:00.000Z");assert.deepEqual(parseCookieConsent(serializeCookieConsent(consent)),consent)});
+test("cookie consent rejects malformed and obsolete records",()=>{assert.equal(parseCookieConsent("bad"),undefined);assert.equal(parseCookieConsent(encodeURIComponent(JSON.stringify({version:0,necessary:true,preferences:true,analytics:true,advertising:true,updatedAt:new Date().toISOString()}))),undefined)});
