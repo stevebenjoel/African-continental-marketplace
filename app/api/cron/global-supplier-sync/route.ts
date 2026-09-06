@@ -1,0 +1,2 @@
+import{env}from"@/src/shared/config/env";import{processQueuedSupplierWebhooks,runGlobalSupplierSync}from"@/src/modules/global-commerce/server/repository";
+export async function POST(request:Request){const secret=env().RECONCILIATION_CRON_SECRET;if(!secret||request.headers.get("authorization")!==`Bearer ${secret}`)return new Response("Unauthorized",{status:401});const webhooks=await processQueuedSupplierWebhooks(),sync=await runGlobalSupplierSync("scheduled","system:global-sync",25);return Response.json({ok:true,webhooks,sync})}

@@ -6,6 +6,7 @@ import { postPaymentJournal } from "@/src/modules/finance/server/journals";
 import { publishAdminNotificationSafely } from "@/src/modules/admin-notifications/server/publisher";
 import { publishLowStockAlerts } from "@/src/modules/inventory/server/integrity";
 import { reservationsCoverStandardItems } from "@/src/modules/inventory/domain/reservation";
+import { queueGlobalSupplierOrders } from "@/src/modules/global-commerce/server/order-automation";
 
 const nextPaymentNumber = () => `PAC-PAY-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`;
 
@@ -15,7 +16,7 @@ export async function captureVerifiedPayment(userId: string, orderId: string, pr
   const order = await databases.getDocument({ databaseId, collectionId: "orders", documentId: orderId });
   if (String(order.customerUserId) !== userId) throw new Error("Order not found");
   const existing = await databases.listDocuments({ databaseId, collectionId: "payments", queries: [Query.equal("orderId", orderId), Query.limit(1)] });
-  if (existing.documents[0]?.status === "captured") return { orderId, paymentId: existing.documents[0].$id };
+  if (existing.documents[0]?.status === "captured") { await queueGlobalSupplierOrders(orderId).catch(error=>console.error("Global supplier order recovery failed",error)); return { orderId, paymentId: existing.documents[0].$id }; }
   if (String(order.status) !== "pending_payment") throw new Error("Order is not payable");
   if (Date.now() - new Date(String(order.createdAt)).getTime() >= 900_000) throw new Error("Order reservation expired");
 
@@ -24,7 +25,8 @@ export async function captureVerifiedPayment(userId: string, orderId: string, pr
   try {
     const [reservations,items] = await Promise.all([databases.listDocuments({ databaseId, collectionId: "inventory_reservations", queries: [Query.equal("orderId", orderId), Query.equal("status", "active"), Query.limit(500)], transactionId: transaction.$id }),databases.listDocuments({databaseId,collectionId:"order_items",queries:[Query.equal("orderId",orderId),Query.limit(500)],transactionId:transaction.$id})]);
     const reservedByOffer=new Map<string,number>();for(const reservation of reservations.documents)reservedByOffer.set(String(reservation.offerId),(reservedByOffer.get(String(reservation.offerId))??0)+Number(reservation.quantity));
-    if(!reservationsCoverStandardItems(items.documents.map(item=>({offerId:String(item.offerId),quantity:Number(item.quantity),purchaseType:String(item.purchaseType??"standard")})),reservedByOffer))throw new Error("No active inventory reservation for a standard item");
+    const offerIds=[...new Set(items.documents.map(item=>String(item.offerId)))],offers=await Promise.all(offerIds.map(offerId=>databases.getDocument({databaseId,collectionId:"seller_offers",documentId:offerId,transactionId:transaction.$id}))),fulfilmentByOffer=new Map(offers.map(offer=>[offer.$id,String(offer.fulfilmentMethod)]));
+    if(!reservationsCoverStandardItems(items.documents.map(item=>({offerId:String(item.offerId),quantity:Number(item.quantity),purchaseType:String(item.purchaseType??"standard"),fulfilmentMethod:fulfilmentByOffer.get(String(item.offerId))})),reservedByOffer))throw new Error("No active inventory reservation for a standard item");
     for (const reservation of reservations.documents) {
       const balances = await databases.listDocuments({ databaseId, collectionId: "inventory_balances", queries: [Query.equal("offerId", String(reservation.offerId)), Query.equal("warehouseId", String(reservation.warehouseId)), Query.limit(1)], transactionId: transaction.$id });
       const balance = balances.documents[0];
@@ -44,6 +46,7 @@ export async function captureVerifiedPayment(userId: string, orderId: string, pr
     await databases.updateTransaction({ transactionId: transaction.$id, commit: true });
     await publishLowStockAlerts(affectedBalanceIds);
     await publishAdminNotificationSafely({eventType:"payment_captured",priority:"action",title:"Payment captured — fulfilment required",body:`${order.currency} ${(Number(order.totalMinor)/100).toLocaleString()} was captured for order ${orderId}.`,entityType:"order",entityId:orderId,href:`/admin/orders?orderId=${orderId}`,roles:["finance_officer","order_fulfilment_manager"]});
+    await queueGlobalSupplierOrders(orderId).catch(error=>console.error("Global supplier order queueing failed",error));
     return { orderId, paymentId: payment.$id };
   } catch (error) {
     await databases.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => undefined);

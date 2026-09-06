@@ -23,6 +23,7 @@ const schema = z.object({
   RECONCILIATION_CRON_SECRET: z.string().min(24).optional()
   ,SUPPLIER_CREDENTIAL_ENCRYPTION_KEY: z.string().min(43).optional()
   ,SUPPLIER_CREDENTIAL_ENCRYPTION_KEY_FILE: z.string().min(1).optional()
+  ,CJ_WEBHOOK_SECRET: z.string().min(24).optional()
 });
 
 export type Environment = z.infer<typeof schema>;

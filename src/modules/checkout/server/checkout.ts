@@ -9,15 +9,19 @@ import { isAcceptedNegotiationUsable } from "@/src/modules/wholesale/domain/nego
 import { publishAdminNotificationSafely } from "@/src/modules/admin-notifications/server/publisher";
 import { createOrderItemCommissionAllocation, type CommissionChannel } from "@/src/modules/finance/server/commissions";
 import { preorderIsOpen } from "@/src/modules/catalogue/domain/product-program";
+import { validateGlobalCheckout } from "@/src/modules/global-commerce/server/checkout";
 
 const publicId = (prefix: string) => `PAC-${prefix}-${new Date().getUTCFullYear()}-${ID.unique().slice(-10).toUpperCase()}`;
 
 export async function checkout(userId: string, addressId: string, couponCode = "") {
   const db = createAppwriteDatabaseClient().databases, databaseId = env().APPWRITE_DATABASE_ID, orderId = ID.unique();
   const [{ items }, addresses] = await Promise.all([getCart(userId), listAddresses(userId)]);
-  if (!items.length || !addresses.documents.some(address => address.$id === addressId)) throw new Error("Invalid checkout");
+  const address=addresses.documents.find(row=>row.$id===addressId);
+  if (!items.length || !address) throw new Error("Invalid checkout");
   const currency = String(items[0].currency);
   if (items.some(item => item.currency !== currency)) throw new Error("Mixed currency");
+  const globalValidations=await validateGlobalCheckout(userId,items,address);
+  const validationByItem=new Map(globalValidations.map(row=>[row.cartItemId,row]));
   const transaction = await db.createTransaction({ ttl: 120 });
   try {
     const verified: Array<{ item: (typeof items)[number]; categoryId: string }> = [];
@@ -52,7 +56,7 @@ export async function checkout(userId: string, addressId: string, couponCode = "
         const program = await db.getDocument({ databaseId, collectionId: "product_programs", documentId: String(item.offerId), transactionId: transaction.$id }).catch(() => null);
         const negotiatedWhiteLabel = negotiationType === "white_label" && Boolean(item.negotiationId);
         if ((!negotiatedWhiteLabel && (!program?.whiteLabelEnabled || Number(item.quantity) < Number(program.whiteLabelMinimumQuantity))) || !item.brandingName || String(item.customizationBrief ?? "").length < 20) throw new Error("White-label programme changed");
-      } else {
+      } else if(String(item.fulfilmentMethod)!=="global_direct") {
         let remaining = Number(item.quantity);
         for (const balance of balances.documents) {
           const take = Math.min(Number(balance.onHand) - Number(balance.reserved) - Number(balance.damaged), remaining);
@@ -79,6 +83,8 @@ export async function checkout(userId: string, addressId: string, couponCode = "
         const channel: CommissionChannel = vendorId === "pacsm-platform" ? "pacsm_products" : item.negotiationId ? "negotiated_wholesale" : item.purchaseOrderId ? "wholesale" : "retail";
         await createOrderItemCommissionAllocation(db, databaseId, transaction.$id, { orderId, vendorOrderId, orderItemId, vendorId, productId: String(item.productId), categoryId, channel, grossMinor: lineTotalMinor, currency, calculatedAt: createdAt });
       }
+      const supplierGroups=new Map<string,typeof rows>();for(const row of rows){const validation=validationByItem.get(row.item.$id);if(validation)supplierGroups.set(validation.supplierId,[...(supplierGroups.get(validation.supplierId)??[]),row])}
+      for(const[supplierId,globalRows]of supplierGroups){const validations=globalRows.map(row=>validationByItem.get(row.item.$id)!);await db.createDocument({databaseId,collectionId:"global_fulfilment_groups",documentId:ID.unique(),permissions:[],transactionId:transaction.$id,data:{orderId,vendorOrderId,supplierId,destinationCountry:validations[0].destinationCountry,currency,itemCount:globalRows.length,totalMinor:globalRows.reduce((sum,row)=>sum+Number(row.item.unitPriceMinor)*Number(row.item.quantity),0),status:"awaiting_payment",validationIds:JSON.stringify(validations.map(row=>row.id)),createdAt,updatedAt:createdAt}});for(const validation of validations)await db.updateDocument({databaseId,collectionId:"global_checkout_validations",documentId:validation.id,transactionId:transaction.$id,data:{status:"converted_to_order",orderId}})}
     }
     for (const { item } of verified) {
       if (item.negotiationId) await db.updateDocument({ databaseId, collectionId: "price_negotiations", documentId: String(item.negotiationId), transactionId: transaction.$id, data: { status: "converted_to_order", orderId, usedAt: createdAt, updatedAt: createdAt } });
