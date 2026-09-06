@@ -22,6 +22,7 @@ const schema = z.object({
   OPENAI_SUPPORT_MODEL: z.string().min(1).default("gpt-5.4-mini"),
   RECONCILIATION_CRON_SECRET: z.string().min(24).optional()
   ,SUPPLIER_CREDENTIAL_ENCRYPTION_KEY: z.string().min(43).optional()
+  ,SUPPLIER_CREDENTIAL_ENCRYPTION_KEY_FILE: z.string().min(1).optional()
 });
 
 export type Environment = z.infer<typeof schema>;

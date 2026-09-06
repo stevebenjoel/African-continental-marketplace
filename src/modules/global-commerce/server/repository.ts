@@ -2,6 +2,7 @@ import "server-only";
 import { ID, Query } from "node-appwrite";
 import { createAppwriteDatabaseClient } from "@/src/integrations/appwrite/server";
 import { env } from "@/src/shared/config/env";
+import { readSecret } from "@/src/shared/security/server-secret";
 import { decryptSupplierCredential, encryptSupplierCredential, maskSupplierCredential } from "../domain/credential-crypto";
 import type { SupplierCredentials } from "../domain/connector";
 import { safeSupplierSlug } from "../domain/supplier";
@@ -9,10 +10,21 @@ import { supplierConnector } from "../connectors/registry";
 
 const databaseId = () => env().APPWRITE_DATABASE_ID;
 const db = () => createAppwriteDatabaseClient().databases;
-const encryptionKey = () => { const key = env().SUPPLIER_CREDENTIAL_ENCRYPTION_KEY; if (!key) throw new Error("Supplier credential encryption is not configured"); return key; };
+const encryptionKey = () => { const config=env(); return readSecret(config.SUPPLIER_CREDENTIAL_ENCRYPTION_KEY,config.SUPPLIER_CREDENTIAL_ENCRYPTION_KEY_FILE,"Supplier credential encryption key"); };
 export const listGlobalSuppliers = () => db().listDocuments({ databaseId: databaseId(), collectionId: "global_suppliers", queries: [Query.orderDesc("priority"), Query.limit(500)] });
 export const listGlobalFeatureFlags = () => db().listDocuments({ databaseId: databaseId(), collectionId: "global_feature_flags", queries: [Query.limit(100)] });
 export const listSupplierConnections = (supplierId: string) => db().listDocuments({ databaseId: databaseId(), collectionId: "supplier_connections", queries: [Query.equal("supplierId", supplierId), Query.orderDesc("testedAt"), Query.limit(20)] });
+
+async function connectedSupplier(supplierId?: string) {
+  const databases=db(), result=supplierId ? null : await databases.listDocuments({databaseId:databaseId(),collectionId:"global_suppliers",queries:[Query.equal("connectionStatus","connected"),Query.orderDesc("priority"),Query.limit(1)]}), supplier=supplierId ? await databases.getDocument({databaseId:databaseId(),collectionId:"global_suppliers",documentId:supplierId}) : result?.documents[0];
+  if(!supplier||supplier.connectionStatus!=="connected")throw new Error("No connected global supplier is available");
+  const credentialRecord=await databases.getDocument({databaseId:databaseId(),collectionId:"supplier_credentials",documentId:supplier.$id}),connector=supplierConnector(String(supplier.provider)),stored=decryptSupplierCredential<SupplierCredentials>(String(credentialRecord.encryptedValue),encryptionKey()),tested=await connector.testConnection(stored);
+  if(tested.credentials.accessToken!==stored.accessToken){const expiresAt=tested.credentials.refreshTokenExpiresAt??tested.credentials.accessTokenExpiresAt;await databases.updateDocument({databaseId:databaseId(),collectionId:"supplier_credentials",documentId:supplier.$id,data:{encryptedValue:encryptSupplierCredential(tested.credentials,encryptionKey()),maskedValue:maskSupplierCredential(tested.credentials.apiKey),encryptionVersion:1,...(expiresAt?{expiresAt}:{}),updatedBy:"system:discovery",updatedAt:new Date().toISOString()}});}
+  return {supplier,connector,credentials:tested.credentials};
+}
+export async function discoverSupplierCategories(supplierId?:string){const source=await connectedSupplier(supplierId);if(!source.connector.listCategories)throw new Error("Supplier category discovery is unavailable");return source.connector.listCategories(source.credentials);}
+export async function discoverSupplierProducts(input:{supplierId?:string;keyword?:string;categoryId?:string;countryCode?:string;page:number;pageSize:number}){const source=await connectedSupplier(input.supplierId);if(!source.connector.searchProducts)throw new Error("Supplier product discovery is unavailable");const result=await source.connector.searchProducts(source.credentials,input);return{supplier:source.supplier,result};}
+export async function discoverSupplierProduct(externalProductId:string,supplierId?:string){if(!/^[A-Za-z0-9_-]{3,200}$/.test(externalProductId))throw new Error("Invalid supplier product identifier");const source=await connectedSupplier(supplierId);if(!source.connector.getProduct)throw new Error("Supplier product detail is unavailable");return{supplier:source.supplier,product:await source.connector.getProduct(source.credentials,externalProductId)};}
 
 async function diplomatsOwnership() { const databases = db(), stores = await databases.listDocuments({ databaseId: databaseId(), collectionId: "stores", queries: [Query.equal("slug", "diplomats-stores"), Query.equal("status", "active"), Query.limit(1)] }), store = stores.documents[0]; if (!store) throw new Error("Active Diplomats Stores record is required"); const vendor = await databases.getDocument({ databaseId: databaseId(), collectionId: "vendors", documentId: String(store.vendorId) }); if (!["approved", "active"].includes(String(vendor.status))) throw new Error("Diplomats Stores vendor must be approved"); return { store, vendor }; }
 export async function createGlobalSupplier(input: { name: string; slug: string; provider: string; apiKey: string; countryCode: string; defaultCurrency: string; actorUserId: string }) {

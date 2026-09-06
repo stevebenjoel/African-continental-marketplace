@@ -3,7 +3,7 @@
 ## Configuration
 
 1. Generate a dedicated 32-byte encryption key and encode it as Base64 (or use 64 hexadecimal characters).
-2. Store it as the locked, server-only Coolify variable `SUPPLIER_CREDENTIAL_ENCRYPTION_KEY`.
+2. Store it as the locked, server-only Coolify variable `SUPPLIER_CREDENTIAL_ENCRYPTION_KEY`. For local development, save that exact same value in a protected external file and set `SUPPLIER_CREDENTIAL_ENCRYPTION_KEY_FILE` to its absolute path.
 3. Provision the `global_` Appwrite collections.
 4. Sign in as Super Admin and open `/admin/global-commerce`.
 5. Enter the CJ API key, save the supplier, then select **Test connection**.
