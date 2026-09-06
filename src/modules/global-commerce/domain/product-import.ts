@@ -1,0 +1,5 @@
+import { z } from "zod";
+export const globalProductImportSchema=z.object({externalProductId:z.string().regex(/^[A-Za-z0-9_-]{3,200}$/),title:z.string().trim().min(3).max(240),categoryId:z.string().trim().min(1).max(36),brandName:z.string().trim().max(120).default(""),countryOfOrigin:z.string().regex(/^[A-Z]{2}$/),pricingRuleId:z.string().trim().min(1).max(36),variantIds:z.array(z.string().min(1).max(200)).min(1).max(100),imageUrls:z.array(z.url().max(250)).max(8).transform(values=>values.slice(0,4))});
+export type GlobalProductImportInput=z.infer<typeof globalProductImportSchema>;
+export function globalProductSlug(title:string,externalId:string){const base=title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,190)||"global-product",suffix=externalId.replace(/[^A-Za-z0-9]/g,"").slice(-12).toLowerCase();return `${base}-${suffix}`.slice(0,240)}
+export function pacsmGlobalSku(externalSku:string,externalId:string){const source=(externalSku||externalId).toUpperCase().replace(/[^A-Z0-9-]/g,"-").replace(/-+/g,"-").replace(/(^-|-$)/g,"");return `CJ-${source}`.slice(0,100)}
